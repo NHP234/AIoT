@@ -296,4 +296,49 @@ Danh sách sản phẩm bàn giao khi kết thúc dự án:
 - **2026-05-31**: Đã dựng firmware scaffold gồm `config`, `alarm`, `auth`, `fsm`, `motion`, `net`, `power` và build PASS trên Windows.
 - **2026-05-31**: Telegram bot đã có các lệnh nền tảng `/arm`, `/disarm`, `/silence`, `/setpin`, `/reboot`, `/status`.
 - **2026-05-31**: MPU6050 đã được nối vào vòng đọc mẫu và FSM/alarm đã có phản hồi LED/buzzer ở mức prototype.
+- **2026-05-31**: `auth` đã nâng lên SHA-256 + salt, lưu trong `Preferences`, và build vẫn PASS.
 - **2026-05-31**: Bước tiếp theo là nạp thử lên board thật, kiểm tra Serial Monitor, cảm biến và luồng Telegram end-to-end.
+
+## 10. Checkpoint tiến độ theo tuần
+
+> Quy ước: ✅ = đã xong trên repo hiện tại, ⬜ = chưa làm xong hoặc chưa kiểm tra được khi chưa có board.
+
+### Tuần 1
+
+- ✅ Hoàn thành bộ tài liệu 7 file markdown trong `docs/`
+- ⬜ Tạo GitHub repo public / thống nhất nhánh `main`
+- ⬜ Tạo Telegram bot thật bằng BotFather và lấy `chat_id` chính thức
+- ⬜ Cài VSCode + PlatformIO trên toàn bộ máy thành viên
+
+### Tuần 2
+
+- ⬜ Lắp khối nguồn TP4056 + MT3608 trên board thật
+- ⬜ Test ESP32 + blink LED trên mạch thật
+- ⬜ Test MPU6050 / SW-420 / buzzer / LED bằng phần cứng
+
+### Tuần 3
+
+- ✅ Dựng `wifi_mgr` với reconnect logic
+- ✅ Tích hợp `UniversalTelegramBot` và command scaffold
+- ✅ Viết `secrets.example.h` và ignore `secrets.h`
+- ⬜ Test reconnect WiFi và nhận lệnh Telegram trên board thật
+
+### Tuần 4
+
+- ✅ Dựng `fsm` transitions cơ bản
+- ✅ Dựng `motion` buffer + persistence
+- ✅ Dựng `auth` SHA-256 + salt + `Preferences`
+- ⬜ Tích hợp FreeRTOS tasks / chạy end-to-end trên board thật
+- ⬜ Test toàn bộ lệnh `/arm`, `/disarm`, `/silence`, `/setpin`, `/reboot`, `/status` bằng hardware
+
+### Tuần 5
+
+- ✅ Dựng module battery và cảnh báo pin yếu
+- ⬜ Tuning threshold bằng dữ liệu thực tế
+- ⬜ Chuyển sang perfboard / đóng hộp
+
+### Tuần 6
+
+- ⬜ Chạy full test suite trên thiết bị thật
+- ⬜ Viết báo cáo / slide / video demo
+- ⬜ Demo trực tiếp và chốt bàn giao
