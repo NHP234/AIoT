@@ -287,3 +287,13 @@ Danh sách sản phẩm bàn giao khi kết thúc dự án:
 - [ ] Thuyết trình 8-10 phút trước lớp + giảng viên.
 - [ ] Demo trực tiếp (đã test trước).
 - [ ] Sẵn sàng trả lời Q&A về kiến trúc, code, phần cứng.
+
+## 9. Log tiến độ thực tế
+
+> Cập nhật nhanh theo trạng thái hiện tại của repo để dễ theo dõi khi làm việc nhóm không ngồi chung.
+
+- **2026-05-31**: Đã khởi tạo `firmware/` bằng PlatformIO cho board `esp32dev` với framework Arduino.
+- **2026-05-31**: Đã dựng firmware scaffold gồm `config`, `alarm`, `auth`, `fsm`, `motion`, `net`, `power` và build PASS trên Windows.
+- **2026-05-31**: Telegram bot đã có các lệnh nền tảng `/arm`, `/disarm`, `/silence`, `/setpin`, `/reboot`, `/status`.
+- **2026-05-31**: MPU6050 đã được nối vào vòng đọc mẫu và FSM/alarm đã có phản hồi LED/buzzer ở mức prototype.
+- **2026-05-31**: Bước tiếp theo là nạp thử lên board thật, kiểm tra Serial Monitor, cảm biến và luồng Telegram end-to-end.
