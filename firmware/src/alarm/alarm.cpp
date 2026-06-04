@@ -1,4 +1,5 @@
 #include "alarm.h"
+#include "fsm/fsm.h"
 
 #include "config.h"
 
@@ -7,6 +8,7 @@ namespace {
 State current_state = State::Boot;
 unsigned long last_blink_ms = 0;
 bool blink_on = false;
+unsigned long triggered_start_ms = 0;
 
 void apply_outputs(bool green_on, bool red_on, bool buzzer_on) {
   digitalWrite(PIN_LED_GREEN, green_on ? HIGH : LOW);
@@ -39,6 +41,7 @@ void alarm_set_state(State state) {
       apply_outputs(true, false, false);
       break;
     case State::Triggered:
+      triggered_start_ms = millis();
       apply_outputs(false, true, true);
       break;
     case State::Offline:
@@ -66,6 +69,9 @@ void alarm_poll() {
       break;
     case State::Triggered:
       apply_outputs(false, true, true);
+      if (now - triggered_start_ms >= ALARM_MAX_DURATION_MS) {
+        fsm_handle_event(Event::AlarmTimeout);
+      }
       break;
     case State::Offline:
       if (now - last_blink_ms >= 250UL) {

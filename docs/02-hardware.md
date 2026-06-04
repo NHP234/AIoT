@@ -19,7 +19,7 @@
 Thiết bị gồm 4 khối chức năng chính:
 
 1. **Khối xử lý trung tâm**: ESP32 DevKit V1.
-2. **Khối cảm biến đầu vào**: MPU6050 (I2C) + SW-420 (digital ngắt).
+2. **Khối cảm biến đầu vào**: MPU6050 (I2C) (Cảm biến rung SW-420 được trì hoãn sang phiên bản sau).
 3. **Khối báo động đầu ra**: buzzer active + 2 LED trạng thái (xanh / đỏ).
 4. **Khối nguồn**: pin 18650 + module TP4056 + công tắc nguồn chính.
 
@@ -32,7 +32,7 @@ hoặc PCB perfboard 5 x 7 cm (phiên bản hoàn thiện).
 |---|-----------|------------------|----|---------------|------------|----------|----------------|
 | 1 | Vi điều khiển | ESP32 DevKit V1 (30 chân) | 1 | 120.000 | 120.000 | Bộ não, xử lý WiFi | Shopee, Hshop, LinhKien |
 | 2 | Cảm biến gia tốc | MPU6050 module GY-521 | 1 | 25.000 | 25.000 | Đo gia tốc 3 trục + gyro | Hshop, Icdayroi |
-| 3 | Cảm biến rung | SW-420 module | 1 | 15.000 | 15.000 | Phát hiện va chạm tức thời | Hshop |
+| 3 | Cảm biến rung | SW-420 module | 0 (Trì hoãn) | 15.000 | 0 | Phát hiện va chạm (Option v2) | Hshop |
 | 4 | Còi | Active buzzer 5V (có sẵn mạch dao động) | 1 | 10.000 | 10.000 | Báo động âm thanh | Hshop |
 | 5 | LED | LED 5mm (xanh + đỏ) + điện trở 220 Ohm | 2 | 2.500 | 5.000 | Hiển thị trạng thái | Hshop |
 | 6 | Pin lithium | Pin 18650 2000-2600 mAh | 1 | 45.000 | 45.000 | Cấp nguồn di động | Hshop |
@@ -44,7 +44,7 @@ hoặc PCB perfboard 5 x 7 cm (phiên bản hoàn thiện).
 | 12 | Dây cắm | Jumper wire Dupont 20 cm (đực-đực + đực-cái) | 40 | 400 | 16.000 | Nối mạch | Hshop |
 | 13 | Vỏ hộp | Hộp nhựa ABS 7 x 5 x 2.5 cm hoặc in 3D | 1 | 30.000 | 30.000 | Đóng gói thiết bị | Shopee |
 | 14 | Phụ kiện | Velcro 2 mặt, băng keo hai mặt | 1 | 10.000 | 10.000 | Dán thiết bị vào laptop | Bất kỳ |
-| | | | | **Tổng cộng** | **349.000** | | |
+| | | | | **Tổng cộng** | **334.000** | | |
 
 > Ghi chú: Dự phòng 10-15% cho hỏng hóc hoặc linh kiện cháy lúc thử nghiệm -> **ngân sách đề xuất 400.000 VND**.
 
@@ -65,7 +65,7 @@ hoặc PCB perfboard 5 x 7 cm (phiên bản hoàn thiện).
 - Điện áp hoạt động 3.3 - 5V (module có sẵn LDO 3.3V).
 - Có chân INT để báo ngắt khi có chuyển động vượt ngưỡng (tính năng hardware interrupt) - rất phù hợp tiết kiệm pin.
 
-### SW-420
+### SW-420 (Trì hoãn - Tuỳ chọn phiên bản sau)
 
 - Cảm biến rung dạng lò xo, đầu ra digital qua IC LM393.
 - Có biến trở chỉnh độ nhạy.
@@ -104,7 +104,7 @@ flowchart TB
 
     subgraph Sensor[Khoi cam bien]
         MPU[MPU6050]
-        VIB[SW-420]
+        VIB[SW-420 - Option v2]
     end
 
     subgraph Brain[Khoi xu ly]
@@ -119,9 +119,9 @@ flowchart TB
 
     BOOST -->|5V VIN| ESP
     ESP -->|3V3| MPU
-    ESP -->|3V3| VIB
+    %% ESP -->|3V3| VIB (Option v2)
     MPU -->|I2C| ESP
-    VIB -->|Digital INT| ESP
+    %% VIB -->|Digital INT| ESP (Option v2)
     ESP --> BUZZ
     ESP --> LEDG
     ESP --> LEDR
@@ -134,7 +134,7 @@ flowchart TB
 | I2C SDA (MPU6050) | GPIO 21 | I/O | Chân I2C mặc định của ESP32 |
 | I2C SCL (MPU6050) | GPIO 22 | I/O | Chân I2C mặc định của ESP32 |
 | MPU6050 INT | GPIO 15 | Input | Ngắt khi có motion, pull-up nội |
-| SW-420 DO | GPIO 14 | Input | Pull-up nội, ngắt FALLING |
+| Chân dự phòng (SW-420) | GPIO 14 | Input | Để trống (Option v2) |
 | Buzzer IN | GPIO 25 | Output | Active high |
 | LED xanh (OK) | GPIO 26 | Output | Nối qua điện trở 220 Ohm |
 | LED đỏ (Alert) | GPIO 27 | Output | Nối qua điện trở 220 Ohm |
@@ -161,12 +161,12 @@ MPU6050 AD0 -> GND  (dia chi I2C = 0x68)
 MPU6050 XCL, XDA -> khong noi
 ```
 
-**SW-420**:
+**SW-420 (Option v2 - Trì hoãn)**:
 
 ```
 SW-420 VCC -> ESP32 3V3
 SW-420 GND -> ESP32 GND
-SW-420 DO  -> ESP32 GPIO 14
+SW-420 DO  -> ESP32 GPIO 14 (Chân dự phòng)
 SW-420 AO  -> khong noi
 ```
 
@@ -229,7 +229,7 @@ MT3608 (OUT-) -> GND chung
 
 - Pin 18650 dung lượng 2500 mAh, điện áp danh định 3.7V -> khoảng 9.25 Wh.
 - ESP32 hoạt động liên tục với WiFi bật: ~120 mA @ 5V = 600 mW.
-- MPU6050 + SW-420 + LED + chế độ idle: ~20 mA.
+- MPU6050 + LED + chế độ idle: ~20 mA.
 - Tổng trung bình (không kể báo động): ~140 mA @ 5V.
 - Hiệu suất MT3608 ~85%.
 

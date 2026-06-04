@@ -54,7 +54,7 @@ gian học lý thuyết). Mỗi tuần có mục tiêu cụ thể và deliverabl
 | Lắp ESP32 + test blink LED | 0.5 ngày | HW lead |
 | Viết sketch test I2C scanner, xác nhận MPU6050 | 0.5 ngày | Dev |
 | Viết sketch đọc gia tốc, in ra Serial | 1 ngày | Dev |
-| Viết sketch test SW-420 interrupt | 0.5 ngày | Dev |
+| Viết sketch test MPU6050 motion logic | 0.5 ngày | Dev |
 | Viết sketch test buzzer + LED trạng thái | 0.5 ngày | Dev |
 
 **Cuối tuần 2**: mọi cảm biến và output đã được test độc lập.
@@ -201,19 +201,18 @@ Mọi thành viên đều cần hiểu cơ bản hệ thống để trả lời 
 |---|-----------|----|---------------|------------|
 | 1 | ESP32 DevKit V1 | 1 | 120.000 | 120.000 |
 | 2 | MPU6050 module | 1 | 25.000 | 25.000 |
-| 3 | SW-420 vibration sensor | 1 | 15.000 | 15.000 |
-| 4 | Active buzzer module | 1 | 10.000 | 10.000 |
-| 5 | LED 5mm xanh + đỏ | 2 | 2.500 | 5.000 |
-| 6 | Pin 18650 2500mAh | 1 | 45.000 | 45.000 |
-| 7 | Holder pin 18650 | 1 | 10.000 | 10.000 |
-| 8 | Module TP4056 USB-C | 1 | 20.000 | 20.000 |
-| 9 | Module MT3608 boost | 1 | 15.000 | 15.000 |
-| 10 | Công tắc SS12D00 | 1 | 3.000 | 3.000 |
-| 11 | Breadboard 400 lỗ | 1 | 25.000 | 25.000 |
-| 12 | Jumper Dupont | 40 | 400 | 16.000 |
-| 13 | Hộp nhựa / in 3D | 1 | 30.000 | 30.000 |
-| 14 | Velcro + băng keo | 1 | 10.000 | 10.000 |
-| | **Tổng linh kiện** | | | **349.000** |
+| 3 | Active buzzer module | 1 | 10.000 | 10.000 |
+| 4 | LED 5mm xanh + đỏ | 2 | 2.500 | 5.000 |
+| 5 | Pin 18650 2500mAh | 1 | 45.000 | 45.000 |
+| 6 | Holder pin 18650 | 1 | 10.000 | 10.000 |
+| 7 | Module TP4056 USB-C | 1 | 20.000 | 20.000 |
+| 8 | Module MT3608 boost | 1 | 15.000 | 15.000 |
+| 9 | Công tắc SS12D00 | 1 | 3.000 | 3.000 |
+| 10 | Breadboard 400 lỗ | 1 | 25.000 | 25.000 |
+| 11 | Jumper Dupont | 40 | 400 | 16.000 |
+| 12 | Hộp nhựa / in 3D | 1 | 30.000 | 30.000 |
+| 13 | Velcro + băng keo | 1 | 10.000 | 10.000 |
+| | **Tổng linh kiện** | | | **334.000** |
 
 ### 6.2 Chi phí phụ trợ
 
@@ -229,16 +228,16 @@ Mọi thành viên đều cần hiểu cơ bản hệ thống để trả lời 
 ### 6.3 Tổng ngân sách
 
 ```text
-Linh kien chinh:     349.000 VND
+Linh kien chinh:     334.000 VND
 Chi phi phu tro:     140.000 VND
 --------
-Tong:                489.000 VND
-Du phong 10%:         49.000 VND
+Tong:                474.000 VND
+Du phong 10%:         47.000 VND
 =========
-Ngan sach de xuat:   540.000 VND
+Ngan sach de xuat:   521.000 VND
 ```
 
-Chia cho nhóm 4 người: **~135.000 VND / người**.
+Chia cho nhóm 4 người: **~130.000 VND / người**.
 
 ## 7. Ngân sách dự phòng
 
@@ -297,6 +296,7 @@ Danh sách sản phẩm bàn giao khi kết thúc dự án:
 - **2026-05-31**: Telegram bot đã có các lệnh nền tảng `/arm`, `/disarm`, `/silence`, `/setpin`, `/reboot`, `/status`.
 - **2026-05-31**: MPU6050 đã được nối vào vòng đọc mẫu và FSM/alarm đã có phản hồi LED/buzzer ở mức prototype.
 - **2026-05-31**: `auth` đã nâng lên SHA-256 + salt, lưu trong `Preferences`, và build vẫn PASS.
+- **2026-05-31**: Native test suite trên host cho `pin_policy` và `motion_filter` đã PASS bằng `pio.exe test -e native`.
 - **2026-05-31**: Bước tiếp theo là nạp thử lên board thật, kiểm tra Serial Monitor, cảm biến và luồng Telegram end-to-end.
 
 ## 10. Checkpoint tiến độ theo tuần
@@ -314,7 +314,7 @@ Danh sách sản phẩm bàn giao khi kết thúc dự án:
 
 - ⬜ Lắp khối nguồn TP4056 + MT3608 trên board thật
 - ⬜ Test ESP32 + blink LED trên mạch thật
-- ⬜ Test MPU6050 / SW-420 / buzzer / LED bằng phần cứng
+- ⬜ Test MPU6050 / buzzer / LED bằng phần cứng
 
 ### Tuần 3
 
@@ -328,6 +328,7 @@ Danh sách sản phẩm bàn giao khi kết thúc dự án:
 - ✅ Dựng `fsm` transitions cơ bản
 - ✅ Dựng `motion` buffer + persistence
 - ✅ Dựng `auth` SHA-256 + salt + `Preferences`
+- ✅ Chạy native test suite trên host cho `pin_policy` và `motion_filter`
 - ⬜ Tích hợp FreeRTOS tasks / chạy end-to-end trên board thật
 - ⬜ Test toàn bộ lệnh `/arm`, `/disarm`, `/silence`, `/setpin`, `/reboot`, `/status` bằng hardware
 

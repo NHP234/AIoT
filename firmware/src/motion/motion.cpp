@@ -5,34 +5,17 @@
 #include <Wire.h>
 
 #include "config.h"
+#include "core/motion_filter.h"
 
 namespace lapguard {
 namespace {
 constexpr uint32_t kSampleIntervalMs = 20UL;
-constexpr size_t kBufferSize = 10;
 
 Adafruit_MPU6050 mpu;
-
-float sample_buffer[kBufferSize] = {};
-size_t sample_index = 0;
-size_t sample_count = 0;
-uint8_t consecutive_count = 0;
-float average_delta = 0.0f;
 bool mpu_ready = false;
 bool trigger_latched = false;
 unsigned long last_sample_ms = 0;
-
-float recompute_average() {
-  if (sample_count == 0) {
-    return 0.0f;
-  }
-
-  float sum = 0.0f;
-  for (size_t index = 0; index < sample_count; ++index) {
-    sum += sample_buffer[index];
-  }
-  return sum / static_cast<float>(sample_count);
-}
+MotionFilter motion_filter(MOTION_THRESHOLD_G, MOTION_PERSISTENCE_N);
 }  // namespace
 
 void motion_init() {
@@ -52,14 +35,7 @@ void motion_init() {
 }
 
 void motion_reset() {
-  for (float& value : sample_buffer) {
-    value = 0.0f;
-  }
-
-  sample_index = 0;
-  sample_count = 0;
-  consecutive_count = 0;
-  average_delta = 0.0f;
+  motion_filter.reset();
   trigger_latched = false;
   last_sample_ms = 0;
 }
@@ -104,34 +80,18 @@ bool motion_poll() {
 }
 
 bool motion_push_sample(float delta_g) {
-  sample_buffer[sample_index] = delta_g;
-  sample_index = (sample_index + 1) % kBufferSize;
-  if (sample_count < kBufferSize) {
-    ++sample_count;
-  }
-
-  average_delta = recompute_average();
-
-  if (average_delta > MOTION_THRESHOLD_G) {
-    if (consecutive_count < UINT8_MAX) {
-      ++consecutive_count;
-    }
-  } else {
-    consecutive_count = 0;
-  }
-
-  return motion_triggered();
+  return motion_filter.push_sample(delta_g);
 }
 
 bool motion_triggered() {
-  return consecutive_count >= MOTION_PERSISTENCE_N;
+  return motion_filter.triggered();
 }
 
 float motion_average() {
-  return average_delta;
+  return motion_filter.average();
 }
 
 uint8_t motion_consecutive_count() {
-  return consecutive_count;
+  return motion_filter.consecutive_count();
 }
 }  // namespace lapguard

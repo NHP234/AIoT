@@ -103,7 +103,7 @@ Hằng số cấu hình public cho toàn project:
 #define PIN_BUZZER      25
 #define PIN_LED_GREEN   26
 #define PIN_LED_RED     27
-#define PIN_SW420       14
+// #define PIN_SW420       14 (Option v2 - Trì hoãn)
 #define PIN_MPU_INT     15
 #define PIN_BATTERY_ADC 34
 
@@ -144,8 +144,8 @@ Hằng số cấu hình public cho toàn project:
 - Init MPU6050 ở `+-4g`, gyro `+-500 deg/s`, filter DLPF 44Hz.
 - Cấu hình MPU6050 interrupt motion detection hardware (tuỳ chọn nâng cao).
 - Hàm `motion_sample()`: đọc gia tốc, tính delta, đẩy vào ring buffer, trả về `true` nếu vượt ngưỡng trong N mẫu.
-- ISR cho SW-420 trên `PIN_SW420` FALLING, chỉ set `volatile bool vib_flag`.
 - Hàm `motion_check()` được `SensorTask` gọi định kỳ, phát `EVT_MOTION` tới FSM.
+- *Lưu ý: Hỗ trợ cảm biến rung SW-420 đã bị trì hoãn.*
 
 ### `alarm/alarm.{h,cpp}`
 

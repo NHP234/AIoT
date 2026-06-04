@@ -137,10 +137,8 @@ Lắp từng khối, test từng khối. Đừng lắp hết rồi test lần cu
    - Chạy sketch test `Wire.h` scan I2C, phải thấy thiết bị ở địa chỉ `0x68`.
    - Nối thêm INT -> GPIO 15 nếu muốn dùng hardware interrupt.
 
-4. **Bước 4 - SW-420**:
-   - Nối VCC 3V3, GND, DO -> GPIO 14.
-   - Chạy sketch đọc GPIO 14, rung cảm biến thấy mức logic thay đổi là OK.
-   - Chỉnh biến trở trên SW-420 để độ nhạy vừa phải.
+4. **Bước 4 - SW-420 (Trì hoãn - Tuỳ chọn)**:
+   - Bước này đã được trì hoãn sang phiên bản sau. Để trống chân GPIO 14 làm chân dự phòng.
 
 5. **Bước 5 - Đầu ra**:
    - Buzzer: VCC 5V (từ VIN), GND, IN -> GPIO 25.
@@ -267,7 +265,6 @@ Nếu còi kêu với rung nhẹ (gõ bàn):
 Nếu còi không kêu khi nhấc laptop:
 
 - Giảm `MOTION_THRESHOLD_G`.
-- Xoay vặn biến trở SW-420 về phía nhạy hơn.
 
 ### E.5 Test mất WiFi
 

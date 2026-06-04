@@ -2,6 +2,7 @@
 
 #include <UniversalTelegramBot.h>
 #include <WiFiClientSecure.h>
+#include <vector>
 
 #include "config.h"
 #include "auth/auth.h"
@@ -15,6 +16,14 @@ namespace {
 WiFiClientSecure secure_client;
 UniversalTelegramBot bot(BOT_TOKEN, secure_client);
 unsigned long last_poll_ms = 0;
+
+struct OfflineEvent {
+  unsigned long event_ms;
+  float delta_g;
+};
+
+constexpr size_t kMaxOfflineEvents = 20;
+std::vector<OfflineEvent> offline_queue;
 
 String state_to_string(State state) {
   switch (state) {
@@ -232,6 +241,16 @@ bool telegram_send_text(const String& chat_id, const String& text) {
 }
 
 bool telegram_send_alert(float delta_g) {
+  if (!wifi_is_connected()) {
+    if (offline_queue.size() < kMaxOfflineEvents) {
+      offline_queue.push_back({millis(), delta_g});
+      Serial.printf("[TG] WiFi down, queued offline event: delta=%.3f g (queue size=%d)\n", delta_g, (int)offline_queue.size());
+    } else {
+      Serial.println(F("[TG] Offline queue full, event discarded"));
+    }
+    return false;
+  }
+
   String message;
   message.reserve(256);
   message += F("CANH BAO LAPGUARD!\n");
@@ -252,6 +271,38 @@ bool telegram_send_status() {
 void telegram_poll() {
   if (!wifi_is_connected()) {
     return;
+  }
+
+  // Flush offline queue if not empty
+  if (!offline_queue.empty()) {
+    String message;
+    message.reserve(512);
+    message += F("[WiFi tro lai]\nTrong thoi gian offline da xay ra:\n");
+    for (const auto& event : offline_queue) {
+      const unsigned long elapsed_sec = (millis() - event.event_ms) / 1000UL;
+      const unsigned long min = elapsed_sec / 60UL;
+      const unsigned long sec = elapsed_sec % 60UL;
+      message += F("- Cach day ");
+      if (min > 0) {
+        message += String(min);
+        message += F(" phut ");
+      }
+      message += String(sec);
+      message += F(" giay: MOTION delta=");
+      message += String(event.delta_g, 3);
+      message += F(" g\n");
+    }
+    message += F("\nState hien tai: ");
+    message += state_to_string(fsm_state());
+
+    Serial.println(F("[TG] Flushing offline queue..."));
+    if (telegram_send_text(CHAT_ID_OWNER, message)) {
+      offline_queue.clear();
+      Serial.println(F("[TG] Offline queue flushed successfully"));
+    } else {
+      Serial.println(F("[TG] Failed to flush offline queue, will retry"));
+      return; // Retry next time
+    }
   }
 
   if (millis() - last_poll_ms < 1000UL) {

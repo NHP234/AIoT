@@ -55,7 +55,7 @@ void loop() {
     lapguard::telegram_poll();
   }
 
-  if (lapguard::fsm_state() == lapguard::State::Armed && lapguard::motion_poll()) {
+  if (lapguard::fsm_is_armed() && lapguard::motion_poll()) {
     lapguard::fsm_handle_event(lapguard::Event::Motion);
     lapguard::telegram_send_alert(lapguard::motion_average());
   }

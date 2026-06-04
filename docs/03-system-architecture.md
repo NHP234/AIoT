@@ -20,7 +20,7 @@ Hệ thống được chia thành 5 tầng, từ vật lý lên người dùng:
 
 ```mermaid
 flowchart TB
-    L1[Layer 1 - Physical: MPU6050, SW-420, Buzzer, LED, Pin]
+    L1[Layer 1 - Physical: MPU6050, Buzzer, LED, Pin (Cảm biến rung SW-420 làm option bổ sung sau)]
     L2[Layer 2 - Driver: I2C, GPIO, ADC, PWM]
     L3[Layer 3 - Application Logic: FSM, Motion detector, Alarm manager, Auth]
     L4[Layer 4 - Network: WiFi, HTTPS, Telegram Bot API]
@@ -40,14 +40,14 @@ Mỗi tầng có trách nhiệm rõ ràng, giảm coupling và dễ test độc 
 flowchart LR
     subgraph Device[Thiet bi LapGuard]
         MPU[MPU6050<br/>I2C]
-        SW420[SW-420<br/>Digital]
+        %% SW420[SW-420<br/>Digital - Option v2]
         MCU[ESP32<br/>Firmware]
         BUZZ[Buzzer]
         LED[LED Status]
         NVS[(NVS<br/>PIN hash,<br/>config)]
 
         MPU --> MCU
-        SW420 --> MCU
+        %% SW420 --> MCU (Option v2)
         MCU --> BUZZ
         MCU --> LED
         MCU <--> NVS
@@ -78,7 +78,7 @@ trò **message broker** miễn phí và đáng tin cậy.
 3. Tính `|a| = sqrt(ax^2 + ay^2 + az^2)`.
 4. Tính `delta = |a| - 9.81` (trừ trọng lực).
 5. Đẩy `delta` vào buffer tròn 10 phần tử để lọc trung bình trượt.
-6. Nếu `|delta_avg| > MOTION_THRESHOLD` hoặc SW-420 ngắt -> gọi `motion_event()`.
+6. Nếu `|delta_avg| > MOTION_THRESHOLD` -> gọi `motion_event()`.
 
 ### Luồng 2: Nhận lệnh Telegram (polling)
 
@@ -187,12 +187,13 @@ Tham số mặc định:
 - `PERSISTENCE = 3` chu kỳ (~60 ms) -> loại rung ngắn do gõ phím
 - `BUFFER_SIZE = 10` -> làm mượt
 
-### Phát hiện qua SW-420 (phụ, nhanh)
-
+### Phát hiện qua SW-420 (Option v2 - Trì hoãn)
+ 
 - Cấu hình GPIO 14 làm **external interrupt** `FALLING`.
 - ISR chỉ set cờ `vib_flag = true` (không làm gì nặng trong ISR).
 - Trong loop chính, nếu `vib_flag && state == ARMED` -> phát `motion_event` ngay.
 - SW-420 phản ứng < 1 ms, bắt được va chạm nhanh mà MPU6050 có thể miss.
+- *Lưu ý: Tính năng này đã được trì hoãn để triển khai ở các phiên bản sau nhằm tối ưu hóa chi phí và đơn giản hóa phần cứng prototype.*
 
 ### Debounce báo động
 

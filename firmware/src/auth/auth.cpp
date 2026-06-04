@@ -4,7 +4,10 @@
 #include <esp_system.h>
 #include <mbedtls/sha256.h>
 
+#include <string>
+
 #include "config.h"
+#include "core/pin_policy.h"
 
 namespace lapguard {
 namespace {
@@ -126,17 +129,8 @@ void auth_init() {
 }
 
 bool auth_is_valid_pin(const String& pin) {
-  if (pin.length() < PIN_MIN_LEN || pin.length() > PIN_MAX_LEN) {
-    return false;
-  }
-
-  for (size_t index = 0; index < pin.length(); ++index) {
-    if (!isDigit(pin[index])) {
-      return false;
-    }
-  }
-
-  return true;
+  const std::string pin_text = pin.c_str();
+  return is_valid_pin_format(pin_text, PIN_MIN_LEN, PIN_MAX_LEN);
 }
 
 bool auth_is_locked() {

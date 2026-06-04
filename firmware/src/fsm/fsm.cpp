@@ -1,10 +1,12 @@
 #include "fsm.h"
 
 #include "alarm/alarm.h"
+#include "net/wifi_mgr.h"
 
 namespace lapguard {
 namespace {
 State current_state = State::Boot;
+State pre_offline_state = State::Disarmed;
 
 void log_state_change(State from, State to) {
   Serial.printf("[FSM] %S -> %S\n", fsm_state_name(from), fsm_state_name(to));
@@ -13,12 +15,17 @@ void log_state_change(State from, State to) {
 
 void fsm_init() {
   current_state = State::Disarmed;
+  pre_offline_state = State::Disarmed;
   alarm_set_state(current_state);
   Serial.printf("[FSM] State -> %S\n", fsm_state_name(current_state));
 }
 
 State fsm_state() {
   return current_state;
+}
+
+bool fsm_is_armed() {
+  return current_state == State::Armed || (current_state == State::Offline && pre_offline_state == State::Armed);
 }
 
 const __FlashStringHelper* fsm_state_name(State state) {
@@ -70,17 +77,30 @@ bool fsm_handle_event(Event event) {
         next_state = State::Armed;
       } else if (event == Event::Disarm) {
         next_state = State::Disarmed;
+      } else if (event == Event::AlarmTimeout) {
+        if (wifi_is_connected()) {
+          next_state = State::Armed;
+        } else {
+          next_state = State::Offline;
+          pre_offline_state = State::Armed;
+        }
       }
       break;
     case State::Offline:
       if (event == Event::WifiUp) {
-        next_state = State::Disarmed;
+        next_state = pre_offline_state;
+      } else if (event == Event::Motion && pre_offline_state == State::Armed) {
+        next_state = State::Triggered;
       }
       break;
   }
 
   if (next_state == current_state) {
     return false;
+  }
+
+  if (next_state == State::Offline && current_state != State::Offline && current_state != State::Boot) {
+    pre_offline_state = current_state;
   }
 
   log_state_change(current_state, next_state);

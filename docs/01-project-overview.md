@@ -60,7 +60,6 @@ chủ động cảnh báo ngay khoảnh khắc có kẻ đụng vào laptop**.
 ### Trong phạm vi (In-Scope)
 
 - Phát hiện chuyển động tịnh tiến và nghiêng qua MPU6050.
-- Phát hiện va đập rung qua SW-420.
 - Còi báo động cục bộ.
 - LED hiển thị trạng thái (offline / disarmed / armed / triggered).
 - Gửi tin nhắn Telegram khi trigger, khi mất/có lại WiFi, khi pin yếu.
@@ -75,6 +74,7 @@ chủ động cảnh báo ngay khoảnh khắc có kẻ đụng vào laptop**.
 - Khoá vật lý / khoá từ.
 - Ứng dụng mobile riêng (Android / iOS).
 - Giao tiếp LoRa / Zigbee / 4G khi không có WiFi.
+- Tích hợp cảm biến rung chuyên dụng SW-420.
 
 ## 5. Đối tượng người dùng
 
@@ -89,7 +89,7 @@ Yêu cầu tối thiểu của người dùng: có smartphone cài Telegram và 
 | ID | Mô tả | Ưu tiên |
 |----|-------|---------|
 | FR1 | Thiết bị phát hiện chuyển động khi `|gia_tốc| - 1g > THRESHOLD` kéo dài qua N mẫu liên tiếp | Must |
-| FR2 | Thiết bị phát hiện rung tức thời qua SW-420 (ngắt GPIO) | Must |
+| FR2 | Thiết bị phát hiện rung tức thời qua cảm biến rung SW-420 | Defer (Hẹn phiên bản sau) |
 | FR3 | Khi trigger, bật còi trong chế độ hú liên tục tối đa 60 giây | Must |
 | FR4 | Khi trigger, gửi tin nhắn Telegram kèm timestamp và mức độ rung đo được | Must |
 | FR5 | Người dùng gửi `/arm <PIN>` để chuyển sang trạng thái giám sát | Must |

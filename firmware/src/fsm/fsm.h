@@ -23,6 +23,7 @@ enum class Event : uint8_t {
 
 void fsm_init();
 State fsm_state();
+bool fsm_is_armed();
 const __FlashStringHelper* fsm_state_name(State state);
 bool fsm_handle_event(Event event);
 }  // namespace lapguard
