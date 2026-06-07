@@ -234,10 +234,15 @@ void telegram_init() {
 
 bool telegram_send_text(const String& chat_id, const String& text) {
   if (!wifi_is_connected()) {
+    Serial.println(F("[TG] Send skipped: WiFi offline"));
     return false;
   }
 
-  return bot.sendMessage(chat_id, text, "");
+  const unsigned long started_ms = millis();
+  const bool sent = bot.sendMessage(chat_id, text, "");
+  Serial.printf("[TG] sendMessage %s in %lu ms\n",
+                sent ? "OK" : "FAILED", millis() - started_ms);
+  return sent;
 }
 
 bool telegram_send_alert(float delta_g) {
@@ -261,6 +266,7 @@ bool telegram_send_alert(float delta_g) {
   message += F("\nRSSI: ");
   message += String(wifi_rssi());
   message += F(" dBm");
+  Serial.printf("[TG] Sending motion alert: delta=%.3f g\n", delta_g);
   return telegram_send_text(CHAT_ID_OWNER, message);
 }
 

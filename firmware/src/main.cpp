@@ -24,6 +24,15 @@ void print_boot_banner() {
 void setup() {
   Serial.begin(115200);
   delay(500);
+
+#ifdef LAPGUARD_SENSOR_TEST
+  Serial.println();
+  Serial.println(F("[SENSOR-TEST] LapGuard MPU diagnostics"));
+  Serial.println(F("[SENSOR-TEST] Keep still for 10s, then rotate and shake each axis."));
+  lapguard::motion_init();
+  return;
+#endif
+
   print_boot_banner();
 
   lapguard::alarm_init();
@@ -41,6 +50,12 @@ void setup() {
 }
 
 void loop() {
+#ifdef LAPGUARD_SENSOR_TEST
+  lapguard::motion_poll();
+  delay(1);
+  return;
+#endif
+
   lapguard::wifi_poll();
   lapguard::alarm_poll();
   lapguard::battery_poll();
@@ -56,8 +71,10 @@ void loop() {
   }
 
   if (lapguard::fsm_is_armed() && lapguard::motion_poll()) {
+    const float delta_g = lapguard::motion_average();
+    Serial.printf("[MOTION] Triggered: delta=%.3f g\n", delta_g);
     lapguard::fsm_handle_event(lapguard::Event::Motion);
-    lapguard::telegram_send_alert(lapguard::motion_average());
+    lapguard::telegram_send_alert(delta_g);
   }
 
   const unsigned long now = millis();
