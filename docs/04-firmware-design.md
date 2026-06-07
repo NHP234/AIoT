@@ -41,11 +41,11 @@ Lý do chọn PlatformIO thay vì Arduino IDE:
 | `mbedtls/sha256` | built-in | Hash PIN |
 | `UniversalTelegramBot` | 1.3.0+ (Brian Lough) | Wrapper Telegram Bot API |
 | `ArduinoJson` | 6.21.0+ | Parse/format JSON |
-| `Adafruit_MPU6050` | 2.2.4+ | Driver MPU6050 |
-| `Adafruit_Sensor` | 1.1.9+ | Dependency của Adafruit_MPU6050 |
+| Driver I2C nội bộ | trong `motion.cpp` | Hỗ trợ MPU6050 và module thay thế MPU6500 |
 | `esp_task_wdt` | built-in | Watchdog |
 
-> Tất cả được khai báo trong `platformio.ini` ở mục `lib_deps` để tự động tải về khi build.
+> Tất cả thư viện bên ngoài được khai báo trong `platformio.ini` ở mục `lib_deps`
+> để tự động tải về khi build.
 
 ## 3. Cấu trúc thư mục code
 
@@ -141,7 +141,8 @@ Hằng số cấu hình public cho toàn project:
 
 ### `sensor/motion.{h,cpp}`
 
-- Init MPU6050 ở `+-4g`, gyro `+-500 deg/s`, filter DLPF 44Hz.
+- Tự nhận diện MPU6050 (`WHO_AM_I=0x68`) hoặc MPU6500 (`0x70`), cấu hình ở
+  `+-4g`, gyro `+-500 deg/s`, filter DLPF khoảng 44Hz.
 - Cấu hình MPU6050 interrupt motion detection hardware (tuỳ chọn nâng cao).
 - Hàm `motion_sample()`: đọc gia tốc, tính delta, đẩy vào ring buffer, trả về `true` nếu vượt ngưỡng trong N mẫu.
 - Hàm `motion_check()` được `SensorTask` gọi định kỳ, phát `EVT_MOTION` tới FSM.
@@ -322,8 +323,6 @@ build_flags =
 lib_deps =
     witnessmenow/UniversalTelegramBot @ ^1.3.0
     bblanchon/ArduinoJson @ ^6.21.3
-    adafruit/Adafruit MPU6050 @ ^2.2.4
-    adafruit/Adafruit Unified Sensor @ ^1.1.9
 
 [env:esp32dev-release]
 extends = env:esp32dev

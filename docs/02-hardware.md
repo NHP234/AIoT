@@ -64,6 +64,8 @@ hoặc PCB perfboard 5 x 7 cm (phiên bản hoàn thiện).
 - Giao tiếp I2C ở địa chỉ mặc định `0x68`.
 - Điện áp hoạt động 3.3 - 5V (module có sẵn LDO 3.3V).
 - Có chân INT để báo ngắt khi có chuyển động vượt ngưỡng (tính năng hardware interrupt) - rất phù hợp tiết kiệm pin.
+- Một số module giá rẻ được bán dưới tên MPU6050 nhưng thực tế gắn MPU6500
+  (`WHO_AM_I = 0x70`). Firmware hỗ trợ cả MPU6050 và MPU6500.
 
 ### SW-420 (Trì hoãn - Tuỳ chọn phiên bản sau)
 

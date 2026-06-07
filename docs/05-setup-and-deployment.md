@@ -325,6 +325,8 @@ Nếu còi không kêu khi nhấc laptop:
 - Kiểm tra dây SDA, SCL có bị tráo không.
 - Thử chân AD0 nối GND (địa chỉ 0x68) hoặc VCC (địa chỉ 0x69).
 - Đo thông mạch, có thể jumper lỗi.
+- Nếu I2C scanner thấy `0x68` nhưng thư viện MPU6050 vẫn báo lỗi, đọc thanh ghi
+  `WHO_AM_I` (`0x75`). Giá trị `0x70` là MPU6500 và cần driver tương thích.
 
 ### 8.5 Còi không kêu
 
