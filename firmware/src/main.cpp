@@ -66,10 +66,6 @@ void loop() {
     last_wifi_connected = wifi_connected;
   }
 
-  if (wifi_connected) {
-    lapguard::telegram_poll();
-  }
-
   if (lapguard::fsm_is_armed() && lapguard::motion_poll()) {
     const float delta_g = lapguard::motion_average();
     Serial.printf("[MOTION] Triggered: delta=%.3f g\n", delta_g);

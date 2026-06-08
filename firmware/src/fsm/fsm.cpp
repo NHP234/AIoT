@@ -1,5 +1,8 @@
 #include "fsm.h"
 
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
+
 #include "alarm/alarm.h"
 #include "net/wifi_mgr.h"
 
@@ -7,6 +10,7 @@ namespace lapguard {
 namespace {
 State current_state = State::Boot;
 State pre_offline_state = State::Disarmed;
+SemaphoreHandle_t state_mutex = nullptr;
 
 void log_state_change(State from, State to) {
   Serial.printf("[FSM] %S -> %S\n", fsm_state_name(from), fsm_state_name(to));
@@ -14,6 +18,7 @@ void log_state_change(State from, State to) {
 }  // namespace
 
 void fsm_init() {
+  state_mutex = xSemaphoreCreateMutex();
   current_state = State::Disarmed;
   pre_offline_state = State::Disarmed;
   alarm_set_state(current_state);
@@ -21,11 +26,26 @@ void fsm_init() {
 }
 
 State fsm_state() {
-  return current_state;
+  if (state_mutex == nullptr) {
+    return current_state;
+  }
+  xSemaphoreTake(state_mutex, portMAX_DELAY);
+  const State state = current_state;
+  xSemaphoreGive(state_mutex);
+  return state;
 }
 
 bool fsm_is_armed() {
-  return current_state == State::Armed || (current_state == State::Offline && pre_offline_state == State::Armed);
+  if (state_mutex == nullptr) {
+    return current_state == State::Armed ||
+           (current_state == State::Offline && pre_offline_state == State::Armed);
+  }
+  xSemaphoreTake(state_mutex, portMAX_DELAY);
+  const bool armed =
+    current_state == State::Armed ||
+    (current_state == State::Offline && pre_offline_state == State::Armed);
+  xSemaphoreGive(state_mutex);
+  return armed;
 }
 
 const __FlashStringHelper* fsm_state_name(State state) {
@@ -46,6 +66,10 @@ const __FlashStringHelper* fsm_state_name(State state) {
 }
 
 bool fsm_handle_event(Event event) {
+  if (state_mutex != nullptr) {
+    xSemaphoreTake(state_mutex, portMAX_DELAY);
+  }
+
   State next_state = current_state;
 
   switch (current_state) {
@@ -96,6 +120,9 @@ bool fsm_handle_event(Event event) {
   }
 
   if (next_state == current_state) {
+    if (state_mutex != nullptr) {
+      xSemaphoreGive(state_mutex);
+    }
     return false;
   }
 
@@ -106,6 +133,9 @@ bool fsm_handle_event(Event event) {
   log_state_change(current_state, next_state);
   current_state = next_state;
   alarm_set_state(current_state);
+  if (state_mutex != nullptr) {
+    xSemaphoreGive(state_mutex);
+  }
   return true;
 }
 }  // namespace lapguard

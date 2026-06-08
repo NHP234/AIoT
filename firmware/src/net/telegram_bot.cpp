@@ -2,6 +2,11 @@
 
 #include <UniversalTelegramBot.h>
 #include <WiFiClientSecure.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
+#include <freertos/task.h>
+
+#include <cstring>
 #include <vector>
 
 #include "config.h"
@@ -13,9 +18,28 @@
 
 namespace lapguard {
 namespace {
-WiFiClientSecure secure_client;
-UniversalTelegramBot bot(BOT_TOKEN, secure_client);
+WiFiClientSecure send_client;
+WiFiClientSecure poll_client;
+UniversalTelegramBot send_bot(BOT_TOKEN, send_client);
+UniversalTelegramBot poll_bot(BOT_TOKEN, poll_client);
 unsigned long last_poll_ms = 0;
+unsigned long last_slow_poll_log_ms = 0;
+QueueHandle_t outbound_queue = nullptr;
+TaskHandle_t send_task_handle = nullptr;
+TaskHandle_t poll_task_handle = nullptr;
+
+enum class OutboundType : uint8_t {
+  Text,
+  MotionAlert,
+};
+
+struct OutboundMessage {
+  OutboundType type;
+  char chat_id[24];
+  char text[600];
+  float delta_g;
+  unsigned long queued_ms;
+};
 
 struct OfflineEvent {
   unsigned long event_ms;
@@ -24,6 +48,29 @@ struct OfflineEvent {
 
 constexpr size_t kMaxOfflineEvents = 20;
 std::vector<OfflineEvent> offline_queue;
+
+bool copy_to_buffer(const String& source, char* destination, size_t capacity) {
+  if (source.length() >= capacity) {
+    return false;
+  }
+
+  std::strncpy(destination, source.c_str(), capacity);
+  destination[capacity - 1] = '\0';
+  return true;
+}
+
+bool enqueue_message(const OutboundMessage& message) {
+  if (outbound_queue == nullptr) {
+    Serial.println(F("[TG] Outbound queue is not initialized"));
+    return false;
+  }
+
+  if (xQueueSend(outbound_queue, &message, 0) != pdTRUE) {
+    Serial.println(F("[TG] Outbound queue full, message dropped"));
+    return false;
+  }
+  return true;
+}
 
 String state_to_string(State state) {
   switch (state) {
@@ -224,38 +271,26 @@ void handle_message(const String& chat_id, const String& text) {
 
   telegram_send_text(chat_id, build_help_message());
 }
-}  // namespace
 
-void telegram_init() {
-  secure_client.setInsecure();
-  last_poll_ms = 0;
-  Serial.println(F("[TG] Initialized"));
-}
-
-bool telegram_send_text(const String& chat_id, const String& text) {
+bool send_text_now(const String& chat_id, const String& text,
+                   unsigned long queued_ms) {
   if (!wifi_is_connected()) {
-    Serial.println(F("[TG] Send skipped: WiFi offline"));
     return false;
   }
 
+  send_bot.waitForResponse = TELEGRAM_SEND_RESPONSE_MS;
   const unsigned long started_ms = millis();
-  const bool sent = bot.sendMessage(chat_id, text, "");
-  Serial.printf("[TG] sendMessage %s in %lu ms\n",
-                sent ? "OK" : "FAILED", millis() - started_ms);
+  const bool sent = send_bot.sendMessage(chat_id, text, "");
+  const unsigned long finished_ms = millis();
+  Serial.printf("[TG] sendMessage %s: queue=%lu ms, network=%lu ms, total=%lu ms\n",
+                sent ? "OK" : "FAILED",
+                started_ms - queued_ms,
+                finished_ms - started_ms,
+                finished_ms - queued_ms);
   return sent;
 }
 
-bool telegram_send_alert(float delta_g) {
-  if (!wifi_is_connected()) {
-    if (offline_queue.size() < kMaxOfflineEvents) {
-      offline_queue.push_back({millis(), delta_g});
-      Serial.printf("[TG] WiFi down, queued offline event: delta=%.3f g (queue size=%d)\n", delta_g, (int)offline_queue.size());
-    } else {
-      Serial.println(F("[TG] Offline queue full, event discarded"));
-    }
-    return false;
-  }
-
+String build_alert_message(float delta_g) {
   String message;
   message.reserve(256);
   message += F("CANH BAO LAPGUARD!\n");
@@ -266,62 +301,203 @@ bool telegram_send_alert(float delta_g) {
   message += F("\nRSSI: ");
   message += String(wifi_rssi());
   message += F(" dBm");
-  Serial.printf("[TG] Sending motion alert: delta=%.3f g\n", delta_g);
-  return telegram_send_text(CHAT_ID_OWNER, message);
+  return message;
 }
 
-bool telegram_send_status() {
-  return telegram_send_text(CHAT_ID_OWNER, build_status_message());
+void store_offline_alert(float delta_g, unsigned long event_ms) {
+  if (offline_queue.size() < kMaxOfflineEvents) {
+    offline_queue.push_back({event_ms, delta_g});
+    Serial.printf("[TG] WiFi down, queued offline event: delta=%.3f g (queue size=%d)\n",
+                  delta_g, static_cast<int>(offline_queue.size()));
+  } else {
+    Serial.println(F("[TG] Offline queue full, event discarded"));
+  }
 }
 
-void telegram_poll() {
-  if (!wifi_is_connected()) {
+void process_outbound_message(const OutboundMessage& message) {
+  if (message.type == OutboundType::MotionAlert) {
+    if (!wifi_is_connected()) {
+      store_offline_alert(message.delta_g, message.queued_ms);
+      return;
+    }
+
+    Serial.printf("[TG] Sending motion alert: delta=%.3f g\n", message.delta_g);
+    if (!send_text_now(CHAT_ID_OWNER, build_alert_message(message.delta_g),
+                       message.queued_ms)) {
+      store_offline_alert(message.delta_g, message.queued_ms);
+    }
     return;
   }
 
-  // Flush offline queue if not empty
-  if (!offline_queue.empty()) {
-    String message;
-    message.reserve(512);
-    message += F("[WiFi tro lai]\nTrong thoi gian offline da xay ra:\n");
-    for (const auto& event : offline_queue) {
-      const unsigned long elapsed_sec = (millis() - event.event_ms) / 1000UL;
-      const unsigned long min = elapsed_sec / 60UL;
-      const unsigned long sec = elapsed_sec % 60UL;
-      message += F("- Cach day ");
-      if (min > 0) {
-        message += String(min);
-        message += F(" phut ");
-      }
-      message += String(sec);
-      message += F(" giay: MOTION delta=");
-      message += String(event.delta_g, 3);
-      message += F(" g\n");
-    }
-    message += F("\nState hien tai: ");
-    message += state_to_string(fsm_state());
+  if (!wifi_is_connected()) {
+    Serial.println(F("[TG] Text message dropped: WiFi offline"));
+    return;
+  }
+  send_text_now(message.chat_id, message.text, message.queued_ms);
+}
 
-    Serial.println(F("[TG] Flushing offline queue..."));
-    if (telegram_send_text(CHAT_ID_OWNER, message)) {
-      offline_queue.clear();
-      Serial.println(F("[TG] Offline queue flushed successfully"));
-    } else {
-      Serial.println(F("[TG] Failed to flush offline queue, will retry"));
-      return; // Retry next time
-    }
+bool flush_offline_queue() {
+  if (offline_queue.empty() || !wifi_is_connected()) {
+    return true;
   }
 
-  if (millis() - last_poll_ms < 1000UL) {
+  String message;
+  message.reserve(512);
+  message += F("[WiFi tro lai]\nTrong thoi gian offline da xay ra:\n");
+  for (const auto& event : offline_queue) {
+    const unsigned long elapsed_sec = (millis() - event.event_ms) / 1000UL;
+    const unsigned long min = elapsed_sec / 60UL;
+    const unsigned long sec = elapsed_sec % 60UL;
+    message += F("- Cach day ");
+    if (min > 0) {
+      message += String(min);
+      message += F(" phut ");
+    }
+    message += String(sec);
+    message += F(" giay: MOTION delta=");
+    message += String(event.delta_g, 3);
+    message += F(" g\n");
+  }
+  message += F("\nState hien tai: ");
+  message += state_to_string(fsm_state());
+
+  Serial.println(F("[TG] Flushing offline queue..."));
+  if (!send_text_now(CHAT_ID_OWNER, message, millis())) {
+    Serial.println(F("[TG] Failed to flush offline queue, will retry"));
+    return false;
+  }
+
+  offline_queue.clear();
+  Serial.println(F("[TG] Offline queue flushed successfully"));
+  return true;
+}
+
+void poll_updates() {
+  if (millis() - last_poll_ms < TELEGRAM_POLL_INTERVAL_MS) {
     return;
   }
   last_poll_ms = millis();
 
-  int num_new_messages = bot.getUpdates(bot.last_message_received + 1);
+  poll_bot.waitForResponse = TELEGRAM_POLL_RESPONSE_MS;
+  const unsigned long started_ms = millis();
+  int num_new_messages = poll_bot.getUpdates(poll_bot.last_message_received + 1);
+  const unsigned long elapsed_ms = millis() - started_ms;
+  if (elapsed_ms > TELEGRAM_POLL_RESPONSE_MS + 1000UL &&
+      millis() - last_slow_poll_log_ms >= 30000UL) {
+    Serial.printf("[TG] getUpdates slow: %lu ms\n", elapsed_ms);
+    last_slow_poll_log_ms = millis();
+  }
+
   while (num_new_messages > 0) {
     for (int index = 0; index < num_new_messages; ++index) {
-      handle_message(bot.messages[index].chat_id, bot.messages[index].text);
+      handle_message(poll_bot.messages[index].chat_id,
+                     poll_bot.messages[index].text);
     }
-    num_new_messages = bot.getUpdates(bot.last_message_received + 1);
+
+    if (uxQueueMessagesWaiting(outbound_queue) > 0) {
+      break;
+    }
+
+    poll_bot.waitForResponse = TELEGRAM_POLL_RESPONSE_MS;
+    num_new_messages =
+      poll_bot.getUpdates(poll_bot.last_message_received + 1);
   }
+}
+
+void telegram_send_task(void*) {
+  OutboundMessage message{};
+  for (;;) {
+    if (xQueueReceive(outbound_queue, &message, pdMS_TO_TICKS(50)) == pdTRUE) {
+      process_outbound_message(message);
+      continue;
+    }
+
+    if (wifi_is_connected() && !flush_offline_queue()) {
+      vTaskDelay(pdMS_TO_TICKS(250));
+    }
+  }
+}
+
+void telegram_poll_task(void*) {
+  for (;;) {
+    if (wifi_is_connected()) {
+      poll_updates();
+    }
+    vTaskDelay(pdMS_TO_TICKS(20));
+  }
+}
+}  // namespace
+
+void telegram_init() {
+  send_client.setInsecure();
+  poll_client.setInsecure();
+  send_client.setTimeout(TELEGRAM_SEND_RESPONSE_MS);
+  poll_client.setTimeout(TELEGRAM_POLL_RESPONSE_MS);
+  send_bot.waitForResponse = TELEGRAM_SEND_RESPONSE_MS;
+  poll_bot.waitForResponse = TELEGRAM_POLL_RESPONSE_MS;
+  last_poll_ms = 0;
+  last_slow_poll_log_ms = 0;
+  outbound_queue = xQueueCreate(TELEGRAM_QUEUE_LENGTH, sizeof(OutboundMessage));
+  if (outbound_queue == nullptr) {
+    Serial.println(F("[TG] Failed to create outbound queue"));
+    return;
+  }
+
+  const BaseType_t send_task_created = xTaskCreatePinnedToCore(
+    telegram_send_task,
+    "TelegramSend",
+    TELEGRAM_SEND_TASK_STACK,
+    nullptr,
+    3,
+    &send_task_handle,
+    0);
+  const BaseType_t poll_task_created = xTaskCreatePinnedToCore(
+    telegram_poll_task,
+    "TelegramPoll",
+    TELEGRAM_POLL_TASK_STACK,
+    nullptr,
+    1,
+    &poll_task_handle,
+    0);
+  if (send_task_created != pdPASS || poll_task_created != pdPASS) {
+    Serial.println(F("[TG] Failed to create Telegram tasks"));
+    if (send_task_handle != nullptr) {
+      vTaskDelete(send_task_handle);
+      send_task_handle = nullptr;
+    }
+    if (poll_task_handle != nullptr) {
+      vTaskDelete(poll_task_handle);
+      poll_task_handle = nullptr;
+    }
+    vQueueDelete(outbound_queue);
+    outbound_queue = nullptr;
+    return;
+  }
+  Serial.println(F("[TG] Initialized async send/poll tasks on core 0"));
+}
+
+bool telegram_send_text(const String& chat_id, const String& text) {
+  OutboundMessage message{};
+  message.type = OutboundType::Text;
+  message.queued_ms = millis();
+  if (!copy_to_buffer(chat_id, message.chat_id, sizeof(message.chat_id)) ||
+      !copy_to_buffer(text, message.text, sizeof(message.text))) {
+    Serial.println(F("[TG] Text message exceeds queue buffer"));
+    return false;
+  }
+
+  return enqueue_message(message);
+}
+
+bool telegram_send_alert(float delta_g) {
+  OutboundMessage message{};
+  message.type = OutboundType::MotionAlert;
+  message.delta_g = delta_g;
+  message.queued_ms = millis();
+  return enqueue_message(message);
+}
+
+bool telegram_send_status() {
+  return telegram_send_text(CHAT_ID_OWNER, build_status_message());
 }
 }  // namespace lapguard
