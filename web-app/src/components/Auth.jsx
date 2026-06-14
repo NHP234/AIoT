@@ -2,6 +2,10 @@ import React, { useState } from "react";
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
 import { ref, set } from "firebase/database";
 import { auth, db } from "../firebase";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Mail, Lock, User, Shield, Loader2 } from "lucide-react";
 
 export default function Auth() {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -18,18 +22,15 @@ export default function Auth() {
 
     try {
       if (isSignUp) {
-        // Sign Up Flow
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
         
-        // Save user info to Realtime Database
         await set(ref(db, `users/${user.uid}`), {
           name: name || "Người dùng LapGuard",
           email: email,
           created_at: Math.floor(Date.now() / 1000)
         });
       } else {
-        // Sign In Flow
         await signInWithEmailAndPassword(auth, email, password);
       }
     } catch (err) {
@@ -41,7 +42,11 @@ export default function Auth() {
         errMsg = "Địa chỉ email không hợp lệ.";
       } else if (err.code === "auth/weak-password") {
         errMsg = "Mật khẩu quá yếu (tối thiểu 6 ký tự).";
-      } else if (err.code === "auth/invalid-credential" || err.code === "auth/wrong-password" || err.code === "auth/user-not-found") {
+      } else if (
+        err.code === "auth/invalid-credential" || 
+        err.code === "auth/wrong-password" || 
+        err.code === "auth/user-not-found"
+      ) {
         errMsg = "Email hoặc mật khẩu không chính xác.";
       }
       setError(errMsg);
@@ -51,80 +56,101 @@ export default function Auth() {
   };
 
   return (
-    <div className="auth-container">
-      <div className="glass-card auth-card">
-        <h2 className="auth-title">{isSignUp ? "Đăng ký LapGuard" : "Đăng nhập LapGuard"}</h2>
-        <p className="auth-subtitle">
-          {isSignUp 
-            ? "Tạo tài khoản để giám sát thiết bị của bạn" 
-            : "Hệ thống bảo vệ laptop thông minh thời gian thực"}
-        </p>
-
+    <div className="flex items-center justify-center min-h-[75vh] px-4">
+      <Card className="w-full max-w-[420px] bg-background/60 backdrop-blur-md border-border/50 shadow-2xl">
+        <CardHeader className="space-y-1 text-center">
+          <div className="flex justify-center mb-2">
+            <div className="p-3 rounded-full bg-primary/10 text-primary">
+              <Shield className="h-8 w-8 text-cyan-400" />
+            </div>
+          </div>
+          <CardTitle className="text-2xl font-bold tracking-tight">
+            {isSignUp ? "Đăng ký LapGuard" : "Đăng nhập LapGuard"}
+          </CardTitle>
+          <CardDescription>
+            {isSignUp 
+              ? "Tạo tài khoản để giám sát thiết bị của bạn" 
+              : "Hệ thống bảo vệ laptop thông minh thời gian thực"}
+          </CardDescription>
+        </CardHeader>
         <form onSubmit={handleSubmit}>
-          {isSignUp && (
-            <div className="form-group">
-              <label className="form-label">Tên của bạn</label>
-              <input
-                type="text"
-                className="form-input"
-                placeholder="Nhập họ và tên"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required={isSignUp}
+          <CardContent className="space-y-4">
+            {isSignUp && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium leading-none text-muted-foreground flex items-center gap-1.5">
+                  <User className="h-3.5 w-3.5" /> Họ và tên
+                </label>
+                <Input
+                  type="text"
+                  placeholder="Nguyễn Văn A"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="bg-black/20 border-border/50"
+                  required={isSignUp}
+                />
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium leading-none text-muted-foreground flex items-center gap-1.5">
+                <Mail className="h-3.5 w-3.5" /> Email
+              </label>
+              <Input
+                type="email"
+                placeholder="email@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="bg-black/20 border-border/50"
+                required
               />
             </div>
-          )}
 
-          <div className="form-group">
-            <label className="form-label">Email</label>
-            <input
-              type="email"
-              className="form-input"
-              placeholder="nhap-email@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium leading-none text-muted-foreground flex items-center gap-1.5">
+                <Lock className="h-3.5 w-3.5" /> Mật khẩu
+              </label>
+              <Input
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="bg-black/20 border-border/50"
+                required
+              />
+            </div>
 
-          <div className="form-group">
-            <label className="form-label">Mật khẩu</label>
-            <input
-              type="password"
-              className="form-input"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
-
-          {error && <div className="error-message">{error}</div>}
-
-          <button 
-            type="submit" 
-            className="btn btn-primary" 
-            style={{ width: "100%", marginTop: "12px", padding: "12px" }}
-            disabled={loading}
-          >
-            {loading ? "Đang xử lý..." : isSignUp ? "ĐĂNG KÝ NGAY" : "ĐĂNG NHẬP"}
-          </button>
+            {error && (
+              <p className="text-sm font-medium text-destructive mt-2">{error}</p>
+            )}
+          </CardContent>
+          <CardFooter className="flex flex-col space-y-4">
+            <Button 
+              type="submit" 
+              className="w-full bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-600 hover:to-purple-700 text-black font-semibold shadow-lg shadow-cyan-500/10 transition-all duration-300"
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Đang xử lý...
+                </>
+              ) : (
+                isSignUp ? "ĐĂNG KÝ" : "ĐĂNG NHẬP"
+              )}
+            </Button>
+            
+            <p className="text-sm text-center text-muted-foreground">
+              {isSignUp ? "Đã có tài khoản? " : "Chưa có tài khoản? "}
+              <span 
+                onClick={() => { setIsSignUp(!isSignUp); setError(""); }}
+                className="text-cyan-400 hover:underline cursor-pointer font-semibold"
+              >
+                {isSignUp ? "Đăng nhập" : "Đăng ký"}
+              </span>
+            </p>
+          </CardFooter>
         </form>
-
-        <div className="auth-toggle">
-          {isSignUp ? (
-            <>
-              Đã có tài khoản?{" "}
-              <span onClick={() => { setIsSignUp(false); setError(""); }}>Đăng nhập</span>
-            </>
-          ) : (
-            <>
-              Chưa có tài khoản?{" "}
-              <span onClick={() => { setIsSignUp(true); setError(""); }}>Đăng ký</span>
-            </>
-          )}
-        </div>
-      </div>
+      </Card>
     </div>
   );
 }
