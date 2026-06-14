@@ -37,40 +37,7 @@ Công cụ:
 
 ## 2. Kiểm thử đơn vị (Unit Test)
 
-### UT-01: auth_verify_pin với PIN đúng
-
-```cpp
-TEST_CASE("verify PIN dung") {
-    auth_init();
-    auth_set_pin("1234");
-    REQUIRE(auth_verify_pin("1234") == true);
-}
-```
-
-### UT-02: auth_verify_pin với PIN sai
-
-```cpp
-TEST_CASE("verify PIN sai") {
-    auth_init();
-    auth_set_pin("1234");
-    REQUIRE(auth_verify_pin("9999") == false);
-}
-```
-
-### UT-03: auth lockout sau 3 lần sai
-
-```cpp
-TEST_CASE("lockout sau 3 lan sai") {
-    auth_init();
-    auth_set_pin("1234");
-    auth_verify_pin("0000");
-    auth_verify_pin("0000");
-    auth_verify_pin("0000");
-    REQUIRE(auth_is_locked() == true);
-}
-```
-
-### UT-04: motion filter không trigger khi dưới threshold
+### UT-01: motion filter không trigger khi dưới threshold
 
 ```cpp
 TEST_CASE("motion filter - khong trigger") {
@@ -80,7 +47,7 @@ TEST_CASE("motion filter - khong trigger") {
 }
 ```
 
-### UT-05: motion filter trigger khi vượt threshold liên tục
+### UT-02: motion filter trigger khi vượt threshold liên tục
 
 ```cpp
 TEST_CASE("motion filter - trigger") {
@@ -89,8 +56,6 @@ TEST_CASE("motion filter - trigger") {
     REQUIRE(motion_check() == true);
 }
 ```
-
-### UT-06: PIN mới phải 4-8 chữ số
 
 ```cpp
 TEST_CASE("PIN validation") {
@@ -113,24 +78,24 @@ Mục tiêu: xác nhận sự kiện chuyển động thật sự được phát
 - Kỳ vọng: Serial in ra 5 dòng `[MOTION] delta=x.xg`.
 - Pass criteria: đúng 5 event, không thiếu không thừa.
 
-### IT-02: Lệnh Telegram -> FSM transition
+### IT-02: Lệnh Firebase -> FSM transition
 
-Mục tiêu: lệnh từ Telegram thực sự chuyển state.
+Mục tiêu: Lệnh thay đổi trên Firebase Database chuyển đổi đúng trạng thái trên thiết bị.
 
-- Setup: ESP32 đã kết nối WiFi, bot hoạt động.
-- Thao tác: từ Telegram gõ `/arm 1234`, `/disarm 1234`, `/arm 1234`, `/silence 1234`, `/disarm 1234`.
-- Kỳ vọng: Serial log chuyển state theo đúng thứ tự: `DISARMED -> ARMED -> DISARMED -> ARMED -> ARMED -> DISARMED`.
+- Setup: ESP32 đã kết nối WiFi và đang nghe WebSocket từ Firebase.
+- Thao tác: Thay đổi giá trị node `/devices/<MAC>/command` lần lượt thành `"ARM"`, `"DISARM"`, `"SILENCE"`.
+- Kỳ vọng: Serial log của ESP32 chuyển state theo đúng thứ tự: `DISARMED -> ARMED -> DISARMED -> ARMED -> ARMED -> DISARMED`.
 
-### IT-03: Offline queue khi mất WiFi
+### IT-03: Đồng bộ ngoại tuyến (Offline Sync) khi mất WiFi
 
-Mục tiêu: sự kiện xảy ra lúc offline được gửi lại khi online.
+Mục tiêu: Sự kiện xảy ra lúc offline được lưu trữ tạm thời và tự động đồng bộ lên Firebase khi có mạng lại.
 
-- Setup: thiết bị ở `ARMED`, WiFi đang hoạt động.
+- Setup: Thiết bị ở trạng thái `ARMED`, WiFi đang hoạt động.
 - Thao tác:
-  1. Tắt WiFi router.
-  2. Rung cảm biến 2 lần cách nhau 20s.
-  3. Bật lại WiFi router.
-- Kỳ vọng: Telegram nhận được 1 tin nhắn tóm tắt liệt kê 2 sự kiện với timestamp chính xác.
+  1. Ngắt kết nối WiFi.
+  2. Rung lắc cảm biến 2 lần cách nhau 20 giây.
+  3. Kết nối lại WiFi.
+- Kỳ vọng: Nhánh `/logs` trên Firebase tự động cập nhật thêm 2 dòng nhật ký báo động với chi tiết thời gian và mức độ rung lắc chính xác.
 
 ## 4. Kiểm thử hệ thống (System / Acceptance Test)
 
@@ -138,15 +103,15 @@ Mục tiêu: sự kiện xảy ra lúc offline được gửi lại khi online.
 
 ### TC-01: Không báo động khi DISARMED và rung mạnh
 
-- **Given**: state = DISARMED.
+- **Given**: state = DISARMED (xác nhận trên Web App hiển thị DISARMED).
 - **When**: nhấc thiết bị lên 30 cm và đặt xuống mạnh.
-- **Then**: không có tiếng còi, không có tin nhắn Telegram, LED xanh vẫn sáng.
+- **Then**: không có tiếng còi, không có cảnh báo trên App, LED xanh vẫn sáng.
 
 ### TC-02: Không báo động giả khi ARMED và rung nhẹ
 
 - **Given**: state = ARMED, thiết bị để yên trên bàn.
 - **When**: gõ ngón tay lên bàn cách thiết bị 10 cm trong 10 giây.
-- **Then**: không có còi, không có tin nhắn.
+- **Then**: không có còi, không có cảnh báo trên App.
 
 ### TC-03: Báo động khi ARMED và bị nhấc
 
@@ -154,51 +119,40 @@ Mục tiêu: sự kiện xảy ra lúc offline được gửi lại khi online.
 - **When**: nhấc thiết bị lên khoảng 10 cm.
 - **Then**:
   - Còi kêu trong <200 ms.
-  - Telegram nhận tin nhắn trong <3s.
+  - Web App nhận cảnh báo và hiện thông báo đẩy trong <3s.
   - LED đỏ sáng.
-  - State chuyển sang TRIGGERED.
+  - State trên Firebase chuyển sang TRIGGERED.
 
-### TC-04: Tắt còi với `/disarm` PIN đúng
+### TC-04: Tắt còi với nút bấm DISARM trên Web App
 
 - **Given**: state = TRIGGERED, còi đang kêu.
-- **When**: gõ `/disarm 1234` từ Telegram.
-- **Then**: còi tắt ngay trong 1s, LED đỏ tắt, LED xanh sáng, bot phản hồi "DISARMED", state = DISARMED.
+- **When**: Người dùng nhấn nút DISARM trên Web App.
+- **Then**: còi tắt ngay trong <1s, LED đỏ tắt, LED xanh sáng liên tục, trạng thái cập nhật trên Firebase thành DISARMED.
 
-### TC-05: Khoá 30s sau 3 lần sai PIN
-
-- **Given**: state bất kỳ.
-- **When**: gõ `/disarm 9999` liên tiếp 3 lần.
-- **Then**:
-  - Lần 1: "PIN sai, còn 2 lần".
-  - Lần 2: "PIN sai, còn 1 lần".
-  - Lần 3: "Khoá 30s do sai PIN 3 lần".
-  - Gõ lệnh tiếp trong 30s: "Tạm khoá, thử lại sau X giây".
-  - Sau 30s: counter reset, chấp nhận lệnh bình thường.
-
-### TC-06: Hoạt động tại chỗ khi mất WiFi
+### TC-05: Hoạt động tại chỗ khi mất WiFi
 
 - **Given**: state = ARMED, WiFi hoạt động.
 - **When**: tắt WiFi router, sau đó rung thiết bị.
 - **Then**:
   - LED chuyển chế độ chớp cam.
-  - Còi vẫn kêu khi rung.
+  - Còi vẫn kêu cục bộ khi rung.
   - State chuyển TRIGGERED local.
 
-### TC-07: Reconnect và flush event sau offline
+### TC-06: Reconnect và đồng bộ log sau offline
 
-- **Given**: vừa hoàn thành TC-06.
+- **Given**: vừa hoàn thành TC-05.
 - **When**: bật lại WiFi router.
 - **Then**:
-  - Trong 30s, LED trở lại chế độ bình thường.
-  - Telegram nhận được tóm tắt các event đã xảy ra.
+  - Trong 20s, LED trở lại chế độ chớp đỏ chậm (ARMED).
+  - Lịch sử báo động xuất hiện trên danh sách nhật ký của Web App.
 
-### TC-08: Cảnh báo pin yếu
+### TC-07: Cảnh báo pin yếu
 
 - **Given**: pin dưới 3.4V.
 - **When**: chu kỳ đo pin 60s kích hoạt.
-- **Then**: Telegram nhận tin nhắn "Pin yếu, xin sạc lại", chỉ 1 lần duy nhất mỗi chu kỳ sạc.
+- **Then**: Web App nhận thông báo "Pin yếu, xin sạc lại" và cập nhật % pin tương ứng.
 
-### TC-09: Thời lượng pin liên tục
+### TC-08: Thời lượng pin liên tục
 
 - **Given**: pin mới sạc đầy.
 - **When**: để thiết bị chạy liên tục ở ARMED, không có trigger.
@@ -208,16 +162,19 @@ Mục tiêu: sự kiện xảy ra lúc offline được gửi lại khi online.
 
 | ID | Tên test | Loại | FR/NFR liên quan | Ưu tiên |
 |----|----------|------|-------------------|---------|
-| UT-01 | verify PIN đúng | Unit | FR5, FR6 | Must |
-| UT-02 | verify PIN sai | Unit | FR10 | Must |
-| UT-03 | lockout 30s | Unit | FR10 | Must |
-| UT-04 | motion dưới threshold | Unit | NFR3 | Must |
-| UT-05 | motion vượt threshold | Unit | FR1 | Must |
-| UT-06 | PIN validation | Unit | FR9 | Should |
-| IT-01 | MPU -> event | Integ | FR1, FR2 | Must |
-| IT-02 | Telegram -> FSM | Integ | FR5-FR8 | Must |
-| IT-03 | Offline queue | Integ | FR13, FR14 | Should |
+| UT-01 | motion dưới threshold | Unit | NFR3 | Must |
+| UT-02 | motion vượt threshold | Unit | FR1 | Must |
+| IT-01 | MPU -> event | Integ | FR1 | Must |
+| IT-02 | Firebase -> FSM | Integ | FR5-FR8 | Must |
+| IT-03 | Offline sync | Integ | FR13, FR14 | Should |
 | TC-01 | DISARMED + rung | System | FR5 | Must |
+| TC-02 | Không báo giả | System | NFR3 | Must |
+| TC-03 | Báo động khi nhấc | System | FR1, FR3, FR4, NFR1, NFR2 | Must |
+| TC-04 | Tắt còi qua Web App | System | FR6 | Must |
+| TC-05 | Offline alarm local | System | FR13 | Must |
+| TC-06 | Reconnect sync | System | FR14 | Should |
+| TC-07 | Pin yếu | System | FR12 | Could |
+| TC-08 | Pin 8h | System | NFR5 | Must |
 | TC-02 | Không báo giả | System | NFR3 | Must |
 | TC-03 | Báo động khi nhấc | System | FR1, FR3, FR4, NFR1, NFR2 | Must |
 | TC-04 | Tắt còi qua /disarm | System | FR6 | Must |
@@ -232,14 +189,14 @@ Mục tiêu: sự kiện xảy ra lúc offline được gửi lại khi online.
 ### 5.1 Hiệu năng
 
 - Đo thời gian trigger -> còi bằng oscilloscope hoặc quay video 60fps (16.67 ms/frame).
-- Đo thời gian trigger -> Telegram nhận tin nhắn: stopwatch thủ công, lặp lại 20 lần lấy trung bình.
+- Đo thời gian trigger -> Web App nhận thông báo: dùng log timestamp so sánh, lặp lại 20 lần lấy trung bình.
 - Tần suất false positive: để thiết bị ARMED trên bàn 24 giờ trong điều kiện bình thường, đếm số lần trigger sai.
 
 ### 5.2 Bảo mật
 
-- Kiểm tra NVS không lưu PIN plaintext: dump NVS bằng `esptool`, grep PIN.
+- Kiểm tra cấu hình bảo mật Firebase Realtime Database Rules đảm bảo chỉ cho phép chủ sở hữu thiết bị được ghi lệnh điều khiển.
 - Kiểm tra `secrets.h` có trong `.gitignore` bằng `git check-ignore firmware/src/secrets.h`.
-- Kiểm tra bot không trả lời chat_id lạ: dùng tài khoản khác gõ lệnh, không có phản hồi.
+- Kiểm tra phân quyền truy cập: Dùng tài khoản Firebase khác cố gắng gửi lệnh ghi vào MAC address của thiết bị, xác minh Firebase trả về lỗi từ chối (Permission Denied).
 
 ### 5.3 Năng lượng
 
@@ -252,10 +209,9 @@ Mẫu bảng báo cáo sau mỗi đợt test:
 
 | ID | Ngày | Kết quả | Thời gian (nếu đo) | Ghi chú | Người test |
 |----|------|---------|---------------------|---------|------------|
-| TC-01 | 2026-05-20 | PASS | - | | <!-- TODO --> |
-| TC-02 | 2026-05-20 | PASS | - | false positive 0/600s | |
-| TC-03 | 2026-05-20 | PASS | 1.8s | Telegram delay | |
-| ... | | | | | |
+| TC-01 | 2026-06-14 | PASS | - | |  |
+| TC-02 | 2026-06-14 | PASS | - | false positive 0/600s | |
+| TC-03 | 2026-06-14 | PASS | 1.2s | Web Push delay | |
 
 Kết quả sẽ được tổng hợp vào file `docs/test-report.md` (tạo ở tuần 6).
 
@@ -274,16 +230,16 @@ Kết quả sẽ được tổng hợp vào file `docs/test-report.md` (tạo �
 | R1 | Linh kiện giao chậm | 4 | 3 | 12 | Đặt sớm tuần 1, mua dự phòng ESP32 |
 | R2 | ESP32 cháy do đấu nhầm nguồn | 5 | 2 | 10 | Test nguồn trước, có board dự phòng |
 | R3 | False positive do rung bàn / quạt | 3 | 4 | 12 | Tuning threshold + persistence, test nhiều môi trường |
-| R4 | False negative - không phát hiện khi nhấc nhẹ | 5 | 2 | 10 | Điều chỉnh ngưỡng MPU6050, test kịch bản thực |
-| R5 | WiFi trường chặn Telegram | 4 | 2 | 8 | Dự phòng hotspot 4G cho demo |
-| R6 | Bot Telegram bị rate limit | 3 | 1 | 3 | Throttle 1 msg/s |
-| R7 | Token bot bị lộ lên git | 5 | 2 | 10 | `.gitignore` secrets, pre-commit hook check |
+| R4 | False negative - không phát hiện khi nhấc nhẹ | 5 | 2 | 10 | Điều chỉnh ngưỡng MPU6500, test kịch bản thực |
+| R5 | Mất kết nối WebSocket của Firebase | 4 | 2 | 8 | Tự động thử lại và duy trì kết nối nền |
+| R6 | Firebase Database bị quá hạn ngạch (quota) | 3 | 1 | 3 | Tối ưu hóa kích thước dữ liệu đồng bộ |
+| R7 | Khóa API Firebase bị lộ lên git | 5 | 2 | 10 | `.gitignore` secrets, pre-commit hook check |
 | R8 | Pin không đủ 8 giờ | 3 | 3 | 9 | Dùng pin 2500+ mAh, tối ưu sleep giữa các sample |
-| R9 | Còi quá nhỏ, không hiệu quả thực tế | 3 | 2 | 6 | Đo dB trước, có thể thêm còi thứ 2 hoặc chuyển loa 3W |
+| R9 | Còi quá nhỏ, không hiệu quả thực tế | 3 | 2 | 6 | Đo dB trước, có thể thêm còi thứ 2 |
 | R10 | Thành viên bận thi giữa kỳ | 3 | 4 | 12 | Phân task sớm, có kế hoạch dự phòng ở tuần 4-5 |
 | R11 | Demo bị lỗi khi thuyết trình | 5 | 2 | 10 | Tập demo trước 2-3 lần, có video dự phòng |
-| R12 | MPU6050 lỗi địa chỉ I2C | 2 | 2 | 4 | Test ngay sau khi nhận linh kiện |
-| R13 | Rò rỉ PIN qua Serial log | 3 | 3 | 9 | Mask PIN trong log, dùng `[REDACTED]` |
+| R12 | MPU6500 lỗi địa chỉ I2C | 2 | 2 | 4 | Test ngay sau khi nhận linh kiện |
+| R13 | Rò rỉ dữ liệu do Firebase Rules lỏng lẻo | 4 | 2 | 8 | Viết Rules nghiêm ngặt chỉ chủ sở hữu được ghi |
 | R14 | Mâu thuẫn nhóm về phân công | 3 | 2 | 6 | Họp weekly, ghi biên bản, leader điều phối |
 
 ### Rủi ro ưu tiên cao (score >= 10)
@@ -295,12 +251,11 @@ R1, R2, R3, R4, R7, R10, R11 cần theo dõi chặt chẽ trong các buổi họ
 Phiên bản v1.0 của LapGuard có những giới hạn sau:
 
 - **Chỉ hoạt động trong vùng phủ WiFi 2.4 GHz**: không có 3G/4G backup, nếu trộm mang đi xa sẽ mất kết nối.
-- **Không có định vị**: không biết laptop bị mang đi đâu sau khi mất kết nối.
+- **Không có định vị**: không biết vật dụng bị mang đi đâu sau khi mất kết nối.
 - **Không chụp ảnh**: không có bằng chứng hình ảnh kẻ trộm.
 - **Âm lượng còi ~85 dB**: đủ trong thư viện nhưng có thể bị át tiếng ở nơi ồn (căng tin).
-- **Phụ thuộc dịch vụ Telegram**: nếu Telegram server down hoặc bị chặn tại Việt Nam, thông báo không đến.
-- **Pin 8h**: không đủ nếu laptop để qua đêm trong phòng học.
-- **Không nhận diện được người dùng hợp pháp**: bất cứ ai có PIN đều disarm được.
+- **Phụ thuộc dịch vụ Firebase**: nếu Firebase server down, đồng bộ trạng thái ngưng hoạt động.
+- **Pin 8h**: không đủ nếu vật dụng để qua đêm trong phòng học.
 - **Còi và thiết bị có thể bị đập vỡ**: một khi kẻ trộm nhận ra nguồn phát tiếng.
 
 ## 9. Hướng mở rộng

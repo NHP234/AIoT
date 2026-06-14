@@ -24,6 +24,32 @@
 - **Debug**: Serial Monitor 115200 baud, thư viện `esp_log` khi cần log có level.
 
 Lý do chọn PlatformIO thay vì Arduino IDE:
+# 04 - Thiết kế firmware
+
+## Mục lục
+
+- [1. Framework và công cụ](#1-framework-và-công-cụ)
+- [2. Danh sách thư viện](#2-danh-sách-thư-viện)
+- [3. Cấu trúc thư mục code](#3-cấu-trúc-thư-mục-code)
+- [4. Mô tả từng module](#4-mô-tả-từng-module)
+- [5. Mô hình đa luồng (FreeRTOS tasks)](#5-mô-hình-đa-luồng-freertos-tasks)
+- [6. Đặc tả lệnh Telegram Bot](#6-đặc-tả-lệnh-telegram-bot)
+- [7. Định dạng tin nhắn cảnh báo](#7-định-dạng-tin-nhắn-cảnh-báo)
+- [8. Cấu hình qua file secrets](#8-cấu-hình-qua-file-secrets)
+- [9. Cấu hình PlatformIO](#9-cấu-hình-platformio)
+- [10. Quy ước code](#10-quy-ước-code)
+
+---
+
+## 1. Framework và công cụ
+
+- **Framework**: Arduino-ESP32 (arduino-espressif32 core, phiên bản >= 2.0.14).
+- **Build system**: **PlatformIO** (khuyến nghị) hoặc Arduino IDE 2.x.
+- **Ngôn ngữ**: C++ 11, style tương tự Arduino.
+- **IDE**: VSCode + PlatformIO extension.
+- **Debug**: Serial Monitor 115200 baud, thư viện `esp_log` khi cần log có level.
+
+Lý do chọn PlatformIO thay vì Arduino IDE:
 
 - Quản lý thư viện qua `platformio.ini` đảm bảo tái lập được build.
 - Hỗ trợ `lib_deps` pin phiên bản cụ thể.
@@ -35,13 +61,12 @@ Lý do chọn PlatformIO thay vì Arduino IDE:
 | Thư viện | Phiên bản | Mục đích |
 |----------|-----------|----------|
 | `WiFi` | built-in | Kết nối WiFi |
-| `WiFiClientSecure` | built-in | HTTPS cho Telegram API |
-| `Preferences` | built-in | NVS lưu PIN hash, config |
-| `Wire` | built-in | I2C cho MPU6050 |
-| `mbedtls/sha256` | built-in | Hash PIN |
-| `UniversalTelegramBot` | 1.3.0+ (Brian Lough) | Wrapper Telegram Bot API |
+| `Firebase-ESP-Client` | 4.4.0+ (Mobizt) | Giao tiếp thời gian thực với Firebase Database |
+| `WiFiManager` | 2.0.16+ (tzapu) | Captive Portal cấu hình WiFi cục bộ |
+| `Preferences` | built-in | NVS lưu trữ cấu hình mạng |
+| `Wire` | built-in | I2C cho MPU6050/6500 |
 | `ArduinoJson` | 6.21.0+ | Parse/format JSON |
-| Driver I2C nội bộ | trong `motion.cpp` | Hỗ trợ MPU6050 và module thay thế MPU6500 |
+| Driver I2C nội bộ | trong `motion.cpp` | Hỗ trợ MPU6050 và MPU6500 |
 | `esp_task_wdt` | built-in | Watchdog |
 
 > Tất cả thư viện bên ngoài được khai báo trong `platformio.ini` ở mục `lib_deps`
@@ -57,30 +82,24 @@ firmware/
 │   ├── main.cpp                       # entry point, setup() + loop()
 │   ├── config.h                       # hang so cau hinh (threshold, pin GPIO)
 │   ├── secrets.example.h              # mau cho secrets.h
-│   ├── secrets.h                      # (KHONG commit) WiFi, token, chat_id
+│   ├── secrets.h                      # (KHONG commit) Firebase keys
 │   ├── fsm/
 │   │   ├── fsm.h
 │   │   └── fsm.cpp                    # finite state machine
 │   ├── sensor/
 │   │   ├── motion.h
-│   │   └── motion.cpp                 # MPU6050 + SW-420
+│   │   └── motion.cpp                 # MPU6050/6500
 │   ├── alarm/
 │   │   ├── alarm.h
 │   │   └── alarm.cpp                  # buzzer + LED
 │   ├── net/
 │   │   ├── wifi_mgr.h
-│   │   ├── wifi_mgr.cpp               # WiFi connect + reconnect
-│   │   ├── telegram_bot.h
-│   │   └── telegram_bot.cpp           # gui/nhan lenh
-│   ├── auth/
-│   │   ├── auth.h
-│   │   └── auth.cpp                   # PIN hash, rate-limit
+│   │   ├── wifi_mgr.cpp               # WiFiManager config
+│   │   ├── firebase_mgr.h
+│   │   └── firebase_mgr.cpp           # dong bo realtime Firebase
 │   └── power/
 │       ├── battery.h
 │       └── battery.cpp                # doc ADC, canh bao pin yeu
-├── test/                              # unit test (native)
-│   └── test_auth/
-│       └── test_auth.cpp
 └── lib/                               # thu vien custom (neu co)
 ```
 
@@ -90,8 +109,8 @@ firmware/
 
 Chịu trách nhiệm:
 
-- Khởi tạo Serial, GPIO, I2C, cảm biến, WiFi, Telegram, NVS.
-- Tạo các FreeRTOS task: `SensorTask`, `TelegramTask`, `FSMTask`, `BatteryTask`.
+- Khởi tạo Serial, GPIO, I2C, cảm biến, WiFiManager, kết nối Firebase, NVS.
+- Tạo các FreeRTOS task: `SensorTask`, `FirebaseTask`, `FSMTask`, `BatteryTask`.
 - Trong `loop()` chỉ feed watchdog và delay nhỏ.
 
 ### `config.h`
@@ -103,7 +122,6 @@ Hằng số cấu hình public cho toàn project:
 #define PIN_BUZZER      25
 #define PIN_LED_GREEN   26
 #define PIN_LED_RED     27
-// #define PIN_SW420       14 (Option v2 - Trì hoãn)
 #define PIN_MPU_INT     15
 #define PIN_BATTERY_ADC 34
 
@@ -119,12 +137,6 @@ Hằng số cấu hình public cho toàn project:
 // Alarm
 #define ALARM_MAX_DURATION_MS  60000
 #define ALARM_REARM_DEAD_MS    10000
-
-// Auth
-#define PIN_MIN_LEN            4
-#define PIN_MAX_LEN            8
-#define AUTH_MAX_FAILS         3
-#define AUTH_LOCKOUT_MS        30000
 
 // Battery
 #define BAT_LOW_MV             3400
@@ -146,7 +158,6 @@ Hằng số cấu hình public cho toàn project:
 - Cấu hình MPU6050 interrupt motion detection hardware (tuỳ chọn nâng cao).
 - Hàm `motion_sample()`: đọc gia tốc, tính delta, đẩy vào ring buffer, trả về `true` nếu vượt ngưỡng trong N mẫu.
 - Hàm `motion_check()` được `SensorTask` gọi định kỳ, phát `EVT_MOTION` tới FSM.
-- *Lưu ý: Hỗ trợ cảm biến rung SW-420 đã bị trì hoãn.*
 
 ### `alarm/alarm.{h,cpp}`
 
@@ -158,32 +169,23 @@ Hằng số cấu hình public cho toàn project:
 
 ### `net/wifi_mgr.{h,cpp}`
 
-- `wifi_begin()`: thử connect trong 10s, nếu fail -> OFFLINE.
-- Task reconnect chạy nền: nếu `WiFi.status() != WL_CONNECTED` thì retry mỗi 10s.
+- Tích hợp thư viện `WiFiManager` để tự động phát WiFi `LapGuard_AP` khi không có WiFi kết nối được.
+- Tùy biến giao diện HTML/CSS (Dark Mode, Bo tròn nút bấm) trong `WiFiManager` để đồng bộ thẩm mỹ với React Web App.
 - Phát event `EVT_WIFI_UP` / `EVT_WIFI_DOWN` tới FSM.
 
-### `net/telegram_bot.{h,cpp}`
+### `net/firebase_mgr.{h,cpp}`
 
-- `tg_init(token)`: khởi tạo `UniversalTelegramBot` với `WiFiClientSecure`.
-- `tg_poll()`: gọi mỗi giây, lấy updates, gọi `on_command(chat_id, text)`.
-- `tg_send_alert(float delta)`: format message + gửi.
-- `tg_send_status()`: gửi state hiện tại + RSSI + battery.
-- Queue offline: `std::vector<OfflineEvent> queue` (giới hạn 20), flush khi WiFi up.
-
-### `auth/auth.{h,cpp}`
-
-- `auth_init()`: đọc PIN hash + salt từ NVS, nếu chưa có thì set default PIN = "1234", hash và lưu.
-- `auth_verify_pin(const String& pin)`: hash và so sánh constant-time với hash lưu.
-- `auth_change_pin(const String& old_pin, const String& new_pin)`: verify old, validate new (4-8 digit), update NVS.
-- `auth_is_locked()`: kiểm tra có đang trong thời gian khoá không.
-- `auth_record_fail()`: tăng counter, nếu >= MAX_FAILS thì set `lockout_until = millis() + 30000`.
+- `firebase_init()`: khởi tạo cấu hình kết nối Firebase Realtime Database bằng Token/API Key.
+- `firebase_sync()`: thiết lập WebSocket lắng nghe nhánh `/devices/<MAC>/command`. Khi nhận được các lệnh `"ARM"`, `"DISARM"`, `"SILENCE"`, nó đẩy sự kiện tương ứng vào hàng đợi FSM và ghi đè lại giá trị `"NONE"` lên Firebase.
+- `firebase_send_alert(float delta)`: Ghi nhận sự kiện báo động lên nhánh `/logs` và cập nhật `status = "TRIGGERED"`.
+- `firebase_update_status()`: Định kỳ đồng bộ thông tin pin và cường độ sóng mạng (RSSI) lên Firebase.
 
 ### `power/battery.{h,cpp}`
 
 - `battery_read_mv()`: đọc ADC1 trên GPIO 34, nhân hệ số phân áp, trả về mV.
 - Chạy mỗi 60s trong `BatteryTask`.
-- Nếu dưới `BAT_LOW_MV` và chưa gửi cảnh báo -> gửi Telegram + set flag.
-- Nếu dưới `BAT_CRITICAL_MV` -> lưu state NVS rồi `esp_deep_sleep_start()`.
+- Nếu dưới `BAT_LOW_MV` và chưa gửi cảnh báo -> Cập nhật trạng thái pin yếu lên Firebase để kích hoạt Web Push cảnh báo cho người dùng.
+- Nếu dưới `BAT_CRITICAL_MV` -> lưu state, gửi cảnh báo khẩn cấp rồi `esp_deep_sleep_start()`.
 
 ## 5. Mô hình đa luồng (FreeRTOS tasks)
 
@@ -191,86 +193,47 @@ ESP32 dual-core, chia task để tránh I/O chặn:
 
 | Task | Core | Priority | Stack | Chu kỳ | Trách nhiệm |
 |------|------|----------|-------|--------|-------------|
-| `SensorTask` | 1 | 5 | 4 KB | 20 ms | Đọc MPU6050, kiểm tra motion |
-| `TelegramTask` | 0 | 3 | 10 KB | 1 s | Poll Telegram, gửi tin nhắn |
+| `SensorTask` | 1 | 5 | 4 KB | 20 ms | Đọc cảm biến, kiểm tra motion |
+| `FirebaseTask` | 0 | 3 | 10 KB | sự kiện (WebSocket) | Lắng nghe command từ Firebase, gửi trạng thái |
 | `FSMTask` | 1 | 4 | 4 KB | event-driven (queue) | Xử lý sự kiện, chuyển state |
 | `BatteryTask` | 0 | 1 | 2 KB | 60 s | Đọc pin |
 
 Giao tiếp giữa task qua **FreeRTOS queue**:
 
-- `xEventQueue`: chứa `Event` enum, SensorTask & TelegramTask đẩy vào, FSMTask consume.
+- `xEventQueue`: chứa `Event` enum, SensorTask & FirebaseTask đẩy vào, FSMTask consume.
 
-## 6. Đặc tả lệnh Telegram Bot
+## 6. Đặc tả cấu trúc dữ liệu và đồng bộ lệnh (Firebase Database)
 
-| Lệnh | Tham số | Điều kiện | Phản hồi thành công | Phản hồi thất bại |
-|------|---------|-----------|---------------------|-------------------|
-| `/start` | không | luôn | giới thiệu + help | - |
-| `/help` | không | luôn | danh sách lệnh | - |
-| `/arm <PIN>` | PIN | state = DISARMED & PIN đúng | "ARMED, dang giam sat" | "PIN sai" / "Dang khoa 30s" |
-| `/disarm <PIN>` | PIN | state = ARMED/TRIGGERED & PIN đúng | "DISARMED" | "PIN sai" |
-| `/silence <PIN>` | PIN | state = TRIGGERED & PIN đúng | "Coi tat, van giam sat" | "PIN sai" / "Khong o TRIGGERED" |
-| `/status` | không | chat_id whitelist | `state`, RSSI, pin mV, uptime | - |
-| `/setpin <old> <new>` | PIN cũ + mới | PIN cũ đúng & PIN mới valid | "Doi PIN thanh cong" | "PIN cu sai" / "PIN moi khong hop le" |
-| `/threshold <value>` | 0.1 - 2.0 | admin only | "Threshold moi: X g" | giá trị ngoài khoảng |
-| `/reboot <PIN>` | PIN | PIN đúng | "Reboot..." | "PIN sai" |
+Các nhánh dữ liệu được ESP32 đồng bộ và phản hồi thời gian thực:
 
-### Ví dụ tương tác
+### 6.1 Đồng bộ trạng thái từ ESP32 lên Firebase
+* Thiết bị ghi trạng thái của mình lên đường dẫn `/devices/<MAC>/status` (các giá trị: `"DISARMED"`, `"ARMED"`, `"TRIGGERED"`, `"OFFLINE"`).
+* Cập nhật định kỳ lượng pin lên `/devices/<MAC>/battery_percent` và cường độ sóng WiFi lên `/devices/<MAC>/wifi_rssi`.
 
-```text
-User:   /start
-Bot:    LapGuard chao ban! Cac lenh:
-        /arm <PIN>     - bat giam sat
-        /disarm <PIN>  - tat giam sat
-        /silence <PIN> - tat coi, giu giam sat
-        /status        - xem trang thai
-        /setpin        - doi PIN
+### 6.2 Nhận lệnh điều khiển từ Web App
+* Khi người dùng nhấn nút điều khiển trên Web App, app ghi giá trị lệnh tương ứng vào `/devices/<MAC>/command`.
+* ESP32 nhận lệnh qua WebSocket, gửi sự kiện tương ứng vào FSM:
+  * Nhận `"ARM"` $\rightarrow$ Phát event `EVT_CMD_ARM`.
+  * Nhận `"DISARM"` $\rightarrow$ Phát event `EVT_CMD_DISARM`.
+  * Nhận `"SILENCE"` $\rightarrow$ Phát event `EVT_CMD_SILENCE`.
+* Sau khi nhận lệnh, ESP32 sẽ ghi đè giá trị `"NONE"` lên `/devices/<MAC>/command` để báo hoàn thành.
 
-User:   /arm 1234
-Bot:    OK, da chuyen sang ARMED luc 09:45:12. Chuc ban an tam.
+## 7. Định dạng gói tin nhật ký báo động (JSON Logs)
 
-User:   /status
-Bot:    State: ARMED
-        WiFi: -52 dBm (tot)
-        Pin: 3950 mV (80%)
-        Uptime: 2h15m
+Mỗi khi phát hiện trộm ở trạng thái ARMED, ESP32 ghi một node mới vào danh sách `/logs/$log_id`:
 
-User:   /disarm 0000
-Bot:    PIN sai. Con 2 lan truoc khi bi khoa.
+```json
+{
+  "device_id": "240AC4123456",
+  "timestamp": 1780725100,
+  "event_type": "MOTION_ALERT",
+  "detail": "Phát hiện chuyển động mạnh (delta = 2.512g)",
+  "resolved": false
+}
 ```
 
-## 7. Định dạng tin nhắn cảnh báo
+Khi người dùng thực hiện tắt còi (DISARM), Web App sẽ cập nhật thuộc tính `"resolved"` của log hiện tại thành `true`.
 
-```text
-CANH BAO CHONG TROM!
---------------------
-Thoi gian: 2026-05-04 14:23:17
-Muc do rung: 3.2 g (MANH)
-Trigger: MPU6050 (accel)
-RSSI: -58 dBm
-Pin: 3920 mV
-
-Gui /disarm <PIN> de tat coi.
-```
-
-Khi pin yếu:
-
-```text
-CANH BAO PIN YEU
-----------------
-Dien ap: 3350 mV (~15%)
-Xin sac lai de tranh mat giam sat.
-```
-
-Khi WiFi có lại sau offline:
-
-```text
-[WiFi tro lai]
-Trong 3m22s offline da xay ra:
-- 14:21:05 MOTION delta=2.1g (coi da keu 42s)
-- 14:22:10 MOTION delta=1.5g (tai phat)
-
-State hien tai: ARMED
-```
 
 ## 8. Cấu hình qua file secrets
 
@@ -279,20 +242,18 @@ State hien tai: ARMED
 ```cpp
 #pragma once
 
-#define WIFI_SSID       "YourWiFiName"
-#define WIFI_PASSWORD   "YourWiFiPassword"
+#define FIREBASE_API_KEY      "AIzaSyA1..."
+#define FIREBASE_DATABASE_URL "https://your-project.firebaseio.com"
 
-#define BOT_TOKEN       "1234567890:AAE..."
-#define CHAT_ID_OWNER   "123456789"
+#define WIFI_AP_SSID          "LapGuard_AP"
+#define WIFI_AP_PASSWORD      "12345678" // Mật khẩu WiFi phát ra để cấu hình
 
-#define DEFAULT_PIN     "1234"
-
-#define DEVICE_NAME     "LapGuard-01"
+#define DEVICE_NAME           "LapGuard-01"
 ```
 
 ### `src/secrets.h` (KHÔNG commit - thêm vào `.gitignore`)
 
-Sao chép từ `secrets.example.h` và điền giá trị thật.
+Sao chép từ `secrets.example.h` và điền giá trị thật của dự án Firebase của bạn.
 
 ### `.gitignore` đề xuất
 
@@ -321,8 +282,9 @@ build_flags =
     -DCONFIG_ARDUINO_LOOP_STACK_SIZE=8192
 
 lib_deps =
-    witnessmenow/UniversalTelegramBot @ ^1.3.0
+    mobizt/Firebase ESP32 Client @ ^4.4.14
     bblanchon/ArduinoJson @ ^6.21.3
+    https://github.com/tzapu/WiFiManager.git
 
 [env:esp32dev-release]
 extends = env:esp32dev
@@ -341,17 +303,8 @@ build_flags =
 - Biến toàn cục: tiền tố `g_`.
 - Biến volatile từ ISR: tiền tố `v_`.
 - Mỗi file `.h` có `#pragma once`.
-- Hàm public có doxygen-style comment ngắn:
-
-```cpp
-/// Kiem tra PIN nguoi dung nhap.
-/// @param pin chuoi 4-8 chu so.
-/// @return true neu khop, false neu sai hoac bi khoa.
-bool auth_verify_pin(const String& pin);
-```
-
 - Không dùng `String` cho dữ liệu lớn (gây phân mảnh heap), chuyển sang `std::string` hoặc buffer cố định.
-- Log dùng `Serial.printf()` có tag: `[SENSOR]`, `[FSM]`, `[TG]`, `[AUTH]`.
+- Log dùng `Serial.printf()` có tag: `[SENSOR]`, `[FSM]`, `[FB]`, `[WIFI]`.
 - Mỗi module phải có ít nhất 1 unit test native (nếu logic không phụ thuộc Arduino).
 
 <!-- TODO: Khi implement code thuc te, cap nhat tai lieu nay neu co thay doi -->

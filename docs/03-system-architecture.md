@@ -39,35 +39,34 @@ Mỗi tầng có trách nhiệm rõ ràng, giảm coupling và dễ test độc 
 ```mermaid
 flowchart LR
     subgraph Device[Thiet bi LapGuard]
-        MPU[MPU6050<br/>I2C]
-        %% SW420[SW-420<br/>Digital - Option v2]
+        MPU[MPU6050/6500<br/>I2C]
         MCU[ESP32<br/>Firmware]
         BUZZ[Buzzer]
         LED[LED Status]
-        NVS[(NVS<br/>PIN hash,<br/>config)]
+        NVS[(NVS<br/>WiFi config)]
 
         MPU --> MCU
-        %% SW420 --> MCU (Option v2)
         MCU --> BUZZ
         MCU --> LED
         MCU <--> NVS
     end
 
-    subgraph Cloud[Cloud]
-        TG[Telegram Bot<br/>API Server]
+    subgraph Cloud[Firebase Cloud]
+        FB[(Firebase Realtime Database)]
+        FCM[Firebase Cloud Messaging]
     end
 
     subgraph User[Nguoi dung]
-        PHONE[Smartphone<br/>Telegram App]
+        APP[React Web App / PWA]
     end
 
-    MCU -- HTTPS POST<br/>sendMessage --> TG
-    MCU -- HTTPS GET<br/>getUpdates --> TG
-    PHONE <--> TG
+    MCU <-->|WebSocket Realtime Sync| FB
+    APP <-->|Realtime SDK| FB
+    FB -->|Trigger Web Push| FCM
+    FCM -->|Push Notification| APP
 ```
 
-Kiến trúc này không cần backend riêng, không cần mở cổng WAN. Telegram đóng vai
-trò **message broker** miễn phí và đáng tin cậy.
+Kiến trúc này sử dụng dịch vụ đám mây Firebase Realtime Database làm trung tâm điều phối trạng thái thời gian thực qua giao thức WebSockets. Người dùng và thiết bị ESP32 đồng bộ dữ liệu song hướng gần như tức thời.
 
 ## 3. Luồng dữ liệu (Data Flow)
 
@@ -80,24 +79,64 @@ trò **message broker** miễn phí và đáng tin cậy.
 5. Đẩy `delta` vào buffer tròn 10 phần tử để lọc trung bình trượt.
 6. Nếu `|delta_avg| > MOTION_THRESHOLD` -> gọi `motion_event()`.
 
-### Luồng 2: Nhận lệnh Telegram (polling)
+### Luồng 2: Nhận lệnh qua Firebase (WebSockets)
 
-1. Task `TelegramTask` chạy chu kỳ 1 s.
-2. Gửi `GET https://api.telegram.org/bot<TOKEN>/getUpdates?offset=<last_update_id>`.
-3. Parse JSON bằng `ArduinoJson`.
-4. Với mỗi update mới:
-   - Kiểm tra `chat_id` có trong whitelist không. Nếu không, bỏ qua.
-   - Parse lệnh (`/arm`, `/disarm`, `/silence`, `/status`, `/setpin`).
-   - Gọi hàm xử lý tương ứng, có thể phát event tới FSM.
-5. Cập nhật `last_update_id` để không xử lý lại.
+1. ESP32 mở kết nối WebSocket ổn định tới Firebase Database khi boot.
+2. ESP32 đăng ký lắng nghe sự thay đổi của nút `/devices/<MAC_ADDRESS>/command`.
+3. Khi người dùng nhấn nút trên React Web App, App ghi lệnh (`"ARM"`, `"DISARM"`, `"SILENCE"`) vào Firebase.
+4. Firebase tự động đẩy (push) thay đổi xuống ESP32.
+5. ESP32 nhận lệnh, phát event tương ứng tới FSM (`EVT_CMD_ARM`, `EVT_CMD_DISARM`, `EVT_CMD_SILENCE`).
+6. ESP32 thực hiện lệnh và ghi đè giá trị `"NONE"` ngược lại Firebase để hoàn thành.
 
 ### Luồng 3: Gửi cảnh báo khi TRIGGERED
 
 1. FSM nhận event `MOTION` khi đang ở state `ARMED`.
 2. Chuyển sang state `TRIGGERED`, bật còi và LED đỏ.
-3. Gọi `telegram_send_alert(delta, timestamp)`.
-4. `telegram.cpp` format message và `POST sendMessage` tới API.
-5. Nếu mất WiFi, đẩy message vào queue offline (RAM), gửi lại khi có kết nối.
+3. ESP32 gọi `firebase_send_alert(delta_g)`.
+4. Cập nhật status thành `"TRIGGERED"` và ghi sự kiện vào danh sách `/logs` trên Firebase.
+5. Firebase Database Trigger sẽ gọi Firebase Cloud Messaging (FCM) để gửi thông báo đẩy (Web Push) đến trình duyệt/điện thoại người dùng.
+6. Nếu mất WiFi, thiết bị lưu tạm sự kiện vào RAM và đẩy lên Firebase đồng bộ khi có kết nối mạng trở lại.
+
+### Luồng 4: Đồng bộ trạng thái định kỳ
+
+1. Thiết bị ESP32 chạy một Task nền `FirebaseTask` định kỳ (ví dụ mỗi 10 giây).
+2. Đo và cập nhật điện áp pin (`battery_percent`), tín hiệu sóng mạng (`wifi_rssi`) và timestamp (`last_seen`) lên Firebase để người dùng tiện theo dõi.
+
+### 3.4 Thiết kế cây dữ liệu JSON trên Firebase Realtime Database
+```json
+{
+  "users": {
+    "$user_uid": {
+      "name": "Tên Người Dùng",
+      "email": "email@example.com",
+      "created_at": 1780722427,
+      "devices": {
+        "$device_mac": true
+      }
+    }
+  },
+  "devices": {
+    "$device_mac": {
+      "owner_id": "$user_uid",
+      "device_name": "LapGuard Laptop của An",
+      "status": "DISARMED",
+      "command": "NONE",
+      "battery_percent": 95,
+      "wifi_rssi": -58,
+      "last_seen": 1780724998
+    }
+  },
+  "logs": {
+    "$log_id": {
+      "device_id": "$device_mac",
+      "timestamp": 1780725100,
+      "event_type": "MOTION_ALERT",
+      "detail": "Phát hiện rung lắc mạnh (delta = 2.5g)",
+      "resolved": false
+    }
+  }
+}
+```
 
 ## 4. Máy trạng thái (Finite State Machine)
 
@@ -109,15 +148,15 @@ stateDiagram-v2
     BOOT --> DISARMED: "init ok"
     BOOT --> OFFLINE: "no wifi"
 
-    DISARMED --> ARMED: "/arm PIN"
+    DISARMED --> ARMED: "cmd_arm"
     DISARMED --> OFFLINE: "lost wifi"
 
     ARMED --> TRIGGERED: "motion event"
-    ARMED --> DISARMED: "/disarm PIN"
+    ARMED --> DISARMED: "cmd_disarm"
     ARMED --> OFFLINE: "lost wifi"
 
-    TRIGGERED --> ARMED: "/silence PIN"
-    TRIGGERED --> DISARMED: "/disarm PIN"
+    TRIGGERED --> ARMED: "cmd_silence"
+    TRIGGERED --> DISARMED: "cmd_disarm"
     TRIGGERED --> TRIGGERED: "timeout 60s<br/>tu tat coi, van alert"
 
     OFFLINE --> DISARMED: "wifi ok &<br/>prev = DISARMED"
@@ -138,17 +177,16 @@ Các state và ý nghĩa:
 
 | Từ | Sự kiện | Đến | Hành động |
 |----|---------|-----|-----------|
-| BOOT | `wifi_connected` | DISARMED | gửi "online" tới Telegram |
+| BOOT | `wifi_connected` | DISARMED | Cập nhật trạng thái "online" lên Firebase |
 | BOOT | `wifi_timeout` | OFFLINE | |
-| DISARMED | `cmd_arm(PIN)` + PIN đúng | ARMED | gửi "armed" tới Telegram |
-| DISARMED | `cmd_arm(PIN)` + PIN sai | DISARMED | tăng counter, nếu >=3 khoá 30s |
-| ARMED | `motion_event` | TRIGGERED | bật còi, gửi alert |
-| ARMED | `cmd_disarm(PIN)` + đúng | DISARMED | gửi "disarmed" |
-| TRIGGERED | `cmd_silence(PIN)` + đúng | ARMED | tắt còi, LED chớp |
-| TRIGGERED | `cmd_disarm(PIN)` + đúng | DISARMED | tắt còi, LED xanh |
-| TRIGGERED | `timer_60s` | TRIGGERED | tắt còi tự động (chống làm phiền lâu), vẫn ghi nhận motion tiếp nếu có |
-| Bất kỳ | `wifi_lost` | OFFLINE | nhớ `prev_state`, vẫn giám sát local |
-| OFFLINE | `wifi_connected` | `prev_state` | gửi tin nhắn tóm tắt offline events |
+| DISARMED | `cmd_arm` | ARMED | Cập nhật trạng thái "ARMED" lên Firebase |
+| ARMED | `motion_event` | TRIGGERED | Bật còi, ghi nhận sự kiện cảnh báo lên Firebase |
+| ARMED | `cmd_disarm` | DISARMED | Tắt còi (nếu có), cập nhật trạng thái "DISARMED" lên Firebase |
+| TRIGGERED | `cmd_silence` | ARMED | Tắt còi, LED đỏ nháy chậm, cập nhật trạng thái "ARMED" lên Firebase |
+| TRIGGERED | `cmd_disarm` | DISARMED | Tắt còi, LED xanh sáng liên tục, cập nhật trạng thái "DISARMED" |
+| TRIGGERED | `timer_60s` | TRIGGERED | Tắt còi tự động (chống tiếng ồn lâu), giữ nguyên trạng thái giám sát |
+| Bất kỳ | `wifi_lost` | OFFLINE | Nhớ `prev_state`, vẫn tiếp tục giám sát và báo động tại chỗ |
+| OFFLINE | `wifi_connected` | `prev_state` | Tự động đồng bộ và đẩy toàn bộ sự kiện lịch sử offline lên Firebase |
 
 ## 6. Thuật toán phát hiện chuyển động
 
@@ -202,48 +240,47 @@ Tham số mặc định:
 
 ## 7. Mô hình bảo mật
 
-### 7.1 Bảo vệ PIN
+### 7.1 Bảo mật tài khoản (Firebase Authentication)
 
-- PIN 4-8 chữ số do người dùng chọn qua `/setpin`.
-- Không lưu plaintext. Lưu: `hash = SHA256(salt || PIN)` trong NVS.
-- `salt` random 16 byte, tạo ra khi thiết bị boot lần đầu, lưu cùng trong NVS.
-- So sánh: hash PIN nhập vào với hash đã lưu, dùng **constant-time compare** để tránh timing attack.
+- Người dùng bắt buộc phải đăng nhập bằng Email và Mật khẩu được mã hóa và quản lý bởi dịch vụ bảo mật của Firebase.
+- Chỉ người dùng đã đăng nhập thành công mới có quyền truy cập vào giao diện quản lý của thiết bị.
 
-### 7.2 Rate-limiting
+### 7.2 Phân quyền dữ liệu (Firebase Realtime Database Rules)
 
-- Đếm số lần nhập PIN sai liên tiếp.
-- Sau 3 lần sai, khoá nhận mọi lệnh Telegram trong 30 giây.
-- Trong thời gian khoá, nếu có lệnh mới vẫn phản hồi "tai khoan tam khoa".
-- Sau 30 giây, reset counter.
+- Để bảo vệ thiết bị khỏi các cuộc tấn công ghi đè lệnh từ người lạ, cơ sở dữ liệu Firebase được thiết lập các quy tắc (Rules) nghiêm ngặt:
+  ```json
+  {
+    "rules": {
+      "devices": {
+        "$device_id": {
+          ".read": "auth != null && data.child('owner_id').val() === auth.uid",
+          ".write": "auth != null && data.child('owner_id').val() === auth.uid"
+        }
+      }
+    }
+  }
+  ```
+- Quy tắc này đảm bảo: Chỉ có người dùng là chủ sở hữu thiết bị (`owner_id` khớp với Firebase `auth.uid`) mới có quyền xem trạng thái và ghi lệnh (`command`) điều khiển thiết bị đó.
 
-### 7.3 Whitelist chat_id
+### 7.3 Bảo mật API Keys và cấu hình dịch vụ
 
-- Chỉ nhận lệnh từ các `chat_id` trong danh sách cấu hình.
-- Chat_id của chủ nhân (hoặc nhóm) được nhập trong `secrets.h`.
-- Lệnh từ chat_id lạ bị bỏ qua im lặng, không log ra Telegram để tránh lộ thông tin.
+- Các khóa API của Firebase (API Key, Database URL, Storage Bucket) được lưu trữ trong file cấu hình [secrets.h](file:///C:/Users/cuphu/OneDrive/M%C3%A1y%20t%C3%ADnh/AIoT/firmware/src/secrets.h) và được bỏ qua không commit lên GitHub qua `.gitignore`.
 
-### 7.4 Bảo vệ token bot
+### 7.4 Bảo mật vận chuyển (HTTPS & WebSockets Secure)
 
-- Token bot không commit vào git, để trong `secrets.h` và thêm vào `.gitignore`.
-- Nếu lộ token, dùng @BotFather `/revoke` để tạo token mới.
-
-### 7.5 Bảo mật vận chuyển
-
-- Telegram Bot API dùng HTTPS với TLS 1.2.
-- ESP32 dùng `WiFiClientSecure` xác thực server certificate qua Telegram root CA đã nhúng sẵn trong thư viện `UniversalTelegramBot`.
+- Giao thức WebSocket và REST API kết nối giữa ESP32 tới Firebase sử dụng SSL/TLS mã hóa trên cổng bảo mật 443 (`wss://` và `https://`), đảm bảo dữ liệu không bị nghe lén trên đường truyền mạng.
 
 ## 8. Xử lý lỗi và trường hợp biên
 
 | Tình huống | Giải pháp |
 |------------|-----------|
-| MPU6050 không phản hồi I2C khi boot | Báo lỗi qua Serial + LED đỏ nhấp nháy SOS, dừng setup, không enter loop |
-| WiFi ngắt giữa chừng | Chuyển vào state OFFLINE, log event vào RAM buffer (giới hạn 20 event), tự reconnect 10s/lần |
-| Telegram API timeout | Retry 3 lần với backoff (1s, 2s, 4s), nếu vẫn fail thì bỏ qua |
-| Pin yếu (< 3.4V) | Gửi cảnh báo "pin yeu, xin sac lai" 1 lần duy nhất |
+| MPU6050/MPU6500 không phản hồi I2C khi boot | Báo lỗi qua Serial + LED đỏ nhấp nháy SOS, dừng setup, không enter loop |
+| WiFi ngắt giữa chừng | Chuyển vào state OFFLINE, lưu các sự kiện chuyển động vào RAM buffer (giới hạn 20), tự động thử kết nối lại mỗi 10 giây |
+| Firebase API timeout | Tự động thử lại và duy trì kết nối WebSocket chạy ngầm |
+| Pin yếu (< 3.4V) | Gửi thông báo đẩy "pin yếu" lên Web App 1 lần duy nhất |
 | Pin cực yếu (< 3.0V) | Lưu state hiện tại vào NVS, shutdown an toàn |
-| Heap thấp | Watchdog 30s sẽ reset ESP32 nếu loop không feed, NVS giữ được state ARMED |
-| Lũ tin nhắn Telegram | Throttle 1 message/giây, queue tối đa 10 message |
-| PIN bị quên | Reset cứng: giữ nút BOOT trên ESP32 + cấp nguồn -> xoá NVS, PIN về mặc định "1234" |
+| Heap thấp | Watchdog 30s sẽ reset ESP32 nếu loop không feed, NVS giữ được trạng thái kết nối cũ |
+| Quên thông tin WiFi cũ hoặc đổi WiFi mới | ESP32 phát WiFi `LapGuard_AP` và tự động mở Captive Portal cấu hình WiFi mới |
 
 ## 9. Timing diagram (sequence)
 
@@ -253,28 +290,26 @@ Tham số mặc định:
 sequenceDiagram
     actor T as Thief
     participant L as LapGuard (ESP32)
-    participant S as MPU6050
+    participant S as MPU6050/6500
     participant B as Buzzer
-    participant TG as Telegram API
-    participant P as Phone (Owner)
+    participant FB as Firebase Database
+    participant P as Phone (React Web App)
 
     Note over L: state = ARMED
-    T->>L: Cham vao laptop
+    T->>L: Chạm vào laptop
     L->>S: Read accel (20ms tick)
     S-->>L: ax, ay, az
     L->>L: delta > threshold<br/>persistence reached
     L->>L: FSM: ARMED -> TRIGGERED
     L->>B: Buzzer ON
-    B-->>T: HU HU HU (~85dB)
-    L->>TG: POST sendMessage(alert)
-    TG-->>P: Notification
-    P->>TG: /disarm 1234
-    TG->>L: getUpdates returns cmd
-    L->>L: verify PIN
+    B-->>T: HÚ HÚ HÚ (~85dB)
+    L->>FB: Ghi nhận trạng thái TRIGGERED và ghi log
+    FB-->>P: Đẩy thông báo Push Notification qua FCM
+    P->>FB: Nhấn nút DISARM trên App (Ghi lệnh DISARM)
+    FB->>L: Đẩy dữ liệu lệnh qua WebSocket (ngay lập tức)
     L->>L: FSM: TRIGGERED -> DISARMED
     L->>B: Buzzer OFF
-    L->>TG: POST sendMessage(disarmed)
-    TG-->>P: Confirmation
+    L->>FB: Ghi đè command = NONE
 ```
 
 ### Kịch bản mất WiFi khi đang bị trộm
@@ -282,18 +317,18 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     actor T as Thief
-    participant L as LapGuard
-    participant TG as Telegram
-    participant P as Phone
+    participant L as LapGuard (ESP32)
+    participant FB as Firebase Database
+    participant P as Phone (React Web App)
 
     Note over L: state = ARMED, wifi OK
-    L--xTG: wifi router down
+    L--xFB: Mất kết nối WiFi router
     Note over L: state = OFFLINE (prev=ARMED)
-    T->>L: Nhac laptop
-    L->>L: Detect motion
-    Note over L: Van vao TRIGGERED<br/>local, coi keu
-    Note over L: Buffer event vao RAM
-    Note over L: Sau 2 phut, wifi co lai
-    L->>TG: sendMessage("wifi tro lai,<br/>trong 2 phut co 1 alert")
-    TG-->>P: Notification tom tat
+    T->>L: Nhấc laptop đi
+    L->>L: Phát hiện chuyển động
+    Note over L: Vẫn chuyển TRIGGERED local, còi hú vang
+    Note over L: Lưu sự kiện chuyển động vào RAM
+    Note over L: Sau 2 phút, WiFi tự động kết nối lại
+    L->>FB: Đẩy toàn bộ logs lưu trong RAM lên Database
+    FB-->>P: Cập nhật nhật ký sự kiện lịch sử trên Web App
 ```

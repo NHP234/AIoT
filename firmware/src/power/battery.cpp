@@ -1,7 +1,6 @@
 #include "battery.h"
 
 #include "config.h"
-#include "net/telegram_bot.h"
 
 namespace lapguard {
 namespace {
@@ -56,10 +55,9 @@ void battery_poll() {
 
   if (battery_is_low() && !low_alert_sent) {
     low_alert_sent = true;
-    String message = F("CANH BAO PIN YEU\nBattery: ");
-    message += String(current_mv);
-    message += F(" mV");
-    telegram_send_text(CHAT_ID_OWNER, message);
+    Serial.printf("[PWR] Battery warning: low voltage (%u mV)\n", current_mv);
+  } else if (!battery_is_low()) {
+    low_alert_sent = false;
   }
 }
 

@@ -2,12 +2,11 @@
 
 #include "config.h"
 #include "alarm/alarm.h"
-#include "auth/auth.h"
 #include "fsm/fsm.h"
 #include "motion/motion.h"
 #include "power/battery.h"
-#include "net/telegram_bot.h"
 #include "net/wifi_mgr.h"
+#include "net/firebase_mgr.h"
 
 namespace {
 unsigned long last_heartbeat_ms = 0;
@@ -17,7 +16,6 @@ void print_boot_banner() {
   Serial.println();
   Serial.println(F("[BOOT] LapGuard firmware skeleton"));
   Serial.printf("[BOOT] Device: %s\n", DEVICE_NAME);
-  Serial.printf("[BOOT] WiFi SSID: %s\n", WIFI_SSID);
 }
 }  // namespace
 
@@ -36,12 +34,11 @@ void setup() {
   print_boot_banner();
 
   lapguard::alarm_init();
-  lapguard::auth_init();
   lapguard::fsm_init();
   lapguard::motion_init();
   lapguard::battery_init();
   lapguard::wifi_init();
-  lapguard::telegram_init();
+  lapguard::firebase_init();
 
   last_wifi_connected = lapguard::wifi_is_connected();
   lapguard::fsm_handle_event(last_wifi_connected ? lapguard::Event::WifiUp : lapguard::Event::WifiDown);
@@ -59,6 +56,7 @@ void loop() {
   lapguard::wifi_poll();
   lapguard::alarm_poll();
   lapguard::battery_poll();
+  lapguard::firebase_poll();
 
   const bool wifi_connected = lapguard::wifi_is_connected();
   if (wifi_connected != last_wifi_connected) {
@@ -70,13 +68,7 @@ void loop() {
     const float delta_g = lapguard::motion_average();
     Serial.printf("[MOTION] Triggered: delta=%.3f g\n", delta_g);
     lapguard::fsm_handle_event(lapguard::Event::Motion);
-    lapguard::telegram_send_alert(delta_g);
-  }
-
-  const unsigned long now = millis();
-  if (now - last_heartbeat_ms >= 5000UL) {
-    Serial.println(F("[LOOP] firmware alive"));
-    last_heartbeat_ms = now;
+    lapguard::firebase_send_alert(delta_g);
   }
   delay(10);
 }

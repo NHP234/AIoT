@@ -5,6 +5,7 @@
 
 #include "alarm/alarm.h"
 #include "net/wifi_mgr.h"
+#include "net/firebase_mgr.h"
 
 namespace lapguard {
 namespace {
@@ -133,6 +134,7 @@ bool fsm_handle_event(Event event) {
   log_state_change(current_state, next_state);
   current_state = next_state;
   alarm_set_state(current_state);
+  firebase_update_status(fsm_state_name(current_state));
   if (state_mutex != nullptr) {
     xSemaphoreGive(state_mutex);
   }

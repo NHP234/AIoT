@@ -3,24 +3,12 @@
 #include <string>
 
 #include "core/motion_filter.h"
-#include "core/pin_policy.h"
 
 using namespace lapguard;
 
 void setUp(void) {}
 
 void tearDown(void) {}
-
-void test_pin_policy_valid_numbers() {
-  TEST_ASSERT_TRUE(is_valid_pin_format("1234", 4, 8));
-  TEST_ASSERT_TRUE(is_valid_pin_format("12345678", 4, 8));
-}
-
-void test_pin_policy_rejects_invalid_values() {
-  TEST_ASSERT_FALSE(is_valid_pin_format("123", 4, 8));
-  TEST_ASSERT_FALSE(is_valid_pin_format("123456789", 4, 8));
-  TEST_ASSERT_FALSE(is_valid_pin_format("12ab", 4, 8));
-}
 
 void test_motion_filter_triggers_after_persistence() {
   MotionFilter filter(0.30f, 3);
@@ -55,9 +43,7 @@ int main(int argc, char **argv) {
   (void)argv;
 
   UNITY_BEGIN();
-  RUN_TEST(test_pin_policy_valid_numbers);
-  RUN_TEST(test_pin_policy_rejects_invalid_values);
   RUN_TEST(test_motion_filter_triggers_after_persistence);
   RUN_TEST(test_motion_filter_resets_on_low_input);
   return UNITY_END();
-}
+}
