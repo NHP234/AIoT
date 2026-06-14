@@ -175,14 +175,7 @@ Mục tiêu: Sự kiện xảy ra lúc offline được lưu trữ tạm thời 
 | TC-06 | Reconnect sync | System | FR14 | Should |
 | TC-07 | Pin yếu | System | FR12 | Could |
 | TC-08 | Pin 8h | System | NFR5 | Must |
-| TC-02 | Không báo giả | System | NFR3 | Must |
-| TC-03 | Báo động khi nhấc | System | FR1, FR3, FR4, NFR1, NFR2 | Must |
-| TC-04 | Tắt còi qua /disarm | System | FR6 | Must |
-| TC-05 | Lockout PIN sai | System | FR10 | Must |
-| TC-06 | Offline alarm local | System | FR13 | Must |
-| TC-07 | Reconnect flush | System | FR14 | Should |
-| TC-08 | Pin yếu | System | FR12 | Could |
-| TC-09 | Pin 8h | System | NFR5 | Must |
+
 
 ## 5. Kiểm thử phi chức năng
 
@@ -263,56 +256,44 @@ Phiên bản v1.0 của LapGuard có những giới hạn sau:
 Các tính năng có thể thêm vào phiên bản v2 hoặc v3:
 
 ### Cấp 1 (dễ, 1-2 tuần thêm)
-
-- **Nhiều chat_id**: gửi thông báo cho cả nhóm (chủ + bố mẹ + bạn thân).
-- **Web dashboard**: dùng `ESPAsyncWebServer`, xem trạng thái và lịch sử trigger qua browser.
-- **OTA update**: nâng cấp firmware qua WiFi không cần cắm USB.
-- **Lịch arm tự động**: arm vào 12:00-13:00 (giờ nghỉ trưa) mỗi ngày.
-- **Thêm nút vật lý**: nhấn giữ 3 giây để arm/disarm khi không có internet.
+- **Chia sẻ thiết bị**: Cho phép tài khoản chủ sở hữu chia sẻ quyền xem/nhận thông báo thiết bị cho các tài khoản người thân/bạn bè.
+- **Biểu đồ thống kê**: Vẽ biểu đồ hiển thị tần suất báo động, đo độ rung trung bình của vật dụng và phân tích thời gian an toàn.
+- **OTA update**: Nâng cấp firmware của ESP32 từ xa thông qua Firebase Storage.
+- **Lịch arm tự động**: Cài đặt khung giờ tự động bật giám sát chống trộm mỗi ngày qua giao diện Web App.
 
 ### Cấp 2 (trung bình, 2-4 tuần)
-
-- **ESP32-CAM**: chụp ảnh kẻ trộm ngay khi trigger, gửi kèm Telegram.
-- **GPS module NEO-6M**: định vị thiết bị khi bị di chuyển.
-- **Module SIM800L / SIM7600**: gửi SMS khi không có WiFi.
-- **RFID RC522**: disarm bằng thẻ, không cần điện thoại.
-- **Bluetooth BLE**: tự động disarm khi chủ đến gần (proximity).
+- **ESP32-CAM**: Chụp ảnh kẻ trộm ngay khi có rung lắc, tải ảnh lên Firebase Storage và hiển thị trực tiếp trên màn hình Web App của người dùng.
+- **GPS module NEO-6M**: Định vị và vẽ bản đồ di chuyển của vật dụng thời gian thực khi bị dịch chuyển.
+- **Module di động 4G (A7670C / SIM7600)**: Tự động kết nối Internet và gửi thông tin về Firebase khi di chuyển ở những nơi không có WiFi.
+- **Mở khóa bằng RFID / NFC**: Cho phép quét thẻ từ vật lý để bật/tắt báo động tại chỗ.
 
 ### Cấp 3 (lớn, >1 tháng)
-
-- **App mobile riêng**: Flutter hoặc React Native, push notification, bản đồ, lịch sử.
-- **MQTT broker trung tâm**: quản lý nhiều thiết bị (cho cả phòng thí nghiệm).
-- **Machine learning trên device**: phân biệt chuyển động do người vs do động đất / gió quạt.
-- **Tích hợp với camera giám sát trường**: trigger thì camera gần nhất bắt đầu ghi hình.
-- **LoRa mesh network**: phủ sóng toàn khuôn viên trường không cần WiFi.
+- **Ứng dụng Native Mobile (React Native)**: Đóng gói và phát hành ứng dụng lên Google Play và App Store để tối ưu hóa trải nghiệm vuốt chạm, widget và thông báo đẩy.
+- **Machine Learning TinyML trên ESP32**: Nhận diện hành vi rung lắc (phân biệt giữa hành vi trộm nhấc máy vs quạt tản nhiệt quay, gõ phím, rung bàn, động đất).
 
 ### Sơ đồ mở rộng kiến trúc
 
 ```mermaid
 flowchart LR
-    subgraph V1[LapGuard v1 - HIEN TAI]
+    subgraph V1[LapGuard v1 - Firebase & Web App PWA]
         ESP1[ESP32]
-        MPU1[MPU6050]
+        MPU1[MPU6050/6500]
+        FB1[(Firebase Database)]
+        ReactApp[React PWA App]
+        ESP1 <--> FB1 <--> ReactApp
     end
 
-    subgraph V2[LapGuard v2 - GPS + Camera]
+    subgraph V2[LapGuard v2 - GPS + Cellular + Storage]
         ESP2[ESP32-CAM]
-        MPU2[MPU6050]
+        MPU2[MPU6050/6500]
         GPS[GPS NEO-6M]
-        SIM[SIM800L]
+        SIM[Module 4G]
+        FB2[(Firebase Database)]
+        FBS[(Firebase Storage)]
+        ESP2 -->|Tải ảnh lên| FBS
+        ESP2 <-->|GPS & Trạng thái| FB2
     end
 
-    subgraph V3[LapGuard v3 - Fleet]
-        MQTT[MQTT Broker]
-        Dev1[Device 1]
-        Dev2[Device 2]
-        DevN[Device N]
-        App[Mobile App]
-    end
-
-    V1 --> V2 --> V3
-    Dev1 --> MQTT
-    Dev2 --> MQTT
-    DevN --> MQTT
-    MQTT --> App
+    V1 --> V2
 ```
+
