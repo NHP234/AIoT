@@ -349,14 +349,14 @@ Nếu còi không kêu khi nhấc laptop:
 
 Dùng checklist này khi nộp bài / demo cho giảng viên:
 
-- [ ] Thiết bị bật được và LED xanh sáng trong <15s.
-- [ ] `/status` trả về chính xác.
-- [ ] `/arm <PIN>` + nhấc thiết bị -> còi kêu + Telegram nhận thông báo trong <3s.
-- [ ] `/disarm <PIN>` tắt còi.
-- [ ] `/silence <PIN>` tắt còi nhưng vẫn ARMED.
-- [ ] Nhập sai PIN 3 lần -> khoá 30s.
-- [ ] Ngắt WiFi -> LED đổi màu -> còi vẫn kêu khi trigger.
-- [ ] Chạy pin liên tục >= 8 giờ.
-- [ ] Vỏ hộp đóng gọn, có nhãn dán tên nhóm.
-- [ ] Slide thuyết trình + video demo sẵn sàng.
-- [ ] Mã nguồn đã push lên GitHub, không chứa `secrets.h`.
+- [x] Thiết bị bật được và LED xanh sáng trong <15s.
+- [x] `/status` trả về chính xác.
+- [x] `/arm <PIN>` + nhấc thiết bị -> còi kêu + Telegram nhận thông báo trong <3s.
+- [x] `/disarm <PIN>` tắt còi.
+- [x] `/silence <PIN>` tắt còi nhưng vẫn ARMED.
+- [x] Nhập sai PIN 3 lần -> khoá 30s.
+- [x] Ngắt WiFi -> LED đổi màu -> còi vẫn kêu khi trigger.
+- [x] Chạy pin liên tục >= 8 giờ.
+- [x] Vỏ hộp đóng gọn, có nhãn dán tên nhóm.
+- [x] Slide thuyết trình + video demo sẵn sàng.
+- [x] Mã nguồn đã push lên GitHub, không chứa `secrets.h`.

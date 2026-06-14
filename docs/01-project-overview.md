@@ -152,10 +152,10 @@ Yêu cầu tối thiểu của người dùng: có smartphone cài Telegram và 
 
 Dự án được coi là thành công nếu đạt được đầy đủ các điểm sau trong buổi báo cáo:
 
-- [ ] Demo trực tiếp cho thầy cô 3 kịch bản ở mục 8 chạy ổn định.
-- [ ] Hoàn thành >= 90% FR ở mức "Must".
-- [ ] Đạt tất cả NFR ở nhóm Hiệu năng và Bảo mật.
-- [ ] Bộ tài liệu gồm 7 file markdown đầy đủ, có sơ đồ minh hoạ.
-- [ ] Video demo <= 2 phút được upload công khai.
-- [ ] Báo cáo powerpoint / pdf trình bày kiến trúc và kết quả.
-- [ ] Chi phí thực tế <= 400.000 VND.
+- [x] Demo trực tiếp cho thầy cô 3 kịch bản ở mục 8 chạy ổn định.
+- [x] Hoàn thành >= 90% FR ở mức "Must".
+- [x] Đạt tất cả NFR ở nhóm Hiệu năng và Bảo mật.
+- [x] Bộ tài liệu gồm 7 file markdown đầy đủ, có sơ đồ minh hoạ.
+- [x] Video demo <= 2 phút được upload công khai.
+- [x] Báo cáo powerpoint / pdf trình bày kiến trúc và kết quả.
+- [x] Chi phí thực tế <= 400.000 VND.

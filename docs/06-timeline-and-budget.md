@@ -258,34 +258,34 @@ Danh sách sản phẩm bàn giao khi kết thúc dự án:
 
 ### 8.1 Tài liệu
 
-- [ ] `README.md` + 7 file trong `docs/` (đã có ở dự án này).
-- [ ] Báo cáo chính thức `.pdf` 10-15 trang (tổng hợp từ markdown).
-- [ ] Slide PowerPoint `.pptx` 15-20 slide.
+- [x] `README.md` + 7 file trong `docs/` (đã có ở dự án này).
+- [x] Báo cáo chính thức `.pdf` 10-15 trang (tổng hợp từ markdown).
+- [x] Slide PowerPoint `.pptx` 15-20 slide.
 
 ### 8.2 Mã nguồn
 
-- [ ] Repo GitHub public (hoặc private share với giảng viên).
-- [ ] Branch `main` ổn định, có tag `v1.0`.
-- [ ] `secrets.example.h` có trong repo, `secrets.h` ignore.
-- [ ] `README` trong `firmware/` hướng dẫn build.
+- [x] Repo GitHub public (hoặc private share với giảng viên).
+- [ ] Nhánh ổn định, có tag `v1.0` (hiện dùng `master`, chưa tạo tag).
+- [x] `secrets.example.h` có trong repo, `secrets.h` ignore.
+- [ ] `README` trong `firmware/` hướng dẫn build (chưa có file).
 
 ### 8.3 Phần cứng
 
-- [ ] 1 thiết bị LapGuard hoàn chỉnh, đóng hộp, dán nhãn.
-- [ ] Bộ pin 18650 đã sạc đầy.
-- [ ] Cáp USB-C để sạc.
+- [x] 1 thiết bị LapGuard hoàn chỉnh, đóng hộp, dán nhãn.
+- [x] Bộ pin 18650 đã sạc đầy.
+- [x] Cáp USB-C để sạc.
 
 ### 8.4 Media
 
-- [ ] Video demo YouTube hoặc Drive (60-120s).
-- [ ] Ảnh sản phẩm high-res (ít nhất 5 góc).
-- [ ] Screenshot Telegram khi có alert.
+- [x] Video demo YouTube hoặc Drive (60-120s).
+- [x] Ảnh sản phẩm high-res (ít nhất 5 góc).
+- [x] Screenshot Telegram khi có alert.
 
 ### 8.5 Trình bày
 
-- [ ] Thuyết trình 8-10 phút trước lớp + giảng viên.
-- [ ] Demo trực tiếp (đã test trước).
-- [ ] Sẵn sàng trả lời Q&A về kiến trúc, code, phần cứng.
+- [x] Thuyết trình 8-10 phút trước lớp + giảng viên.
+- [x] Demo trực tiếp (đã test trước).
+- [x] Sẵn sàng trả lời Q&A về kiến trúc, code, phần cứng.
 
 ## 9. Log tiến độ thực tế
 
