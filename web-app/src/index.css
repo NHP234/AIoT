@@ -33,12 +33,14 @@
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
   font-family: var(--font-sans);
-  color-scheme: dark;
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
+  color-scheme: light;
 
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+.dark {
+  color-scheme: dark;
 }
 
 * {
@@ -50,11 +52,14 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: radial-gradient(circle at 50% 0%, #151829 0%, #090a0f 70%);
+  background: radial-gradient(circle at 50% 0%, #f1f5f9 0%, #e2e8f0 100%);
   background-attachment: fixed;
   overflow-x: hidden;
-  color: var(--text-primary);
   line-height: 1.5;
+}
+
+.dark body {
+  background: radial-gradient(circle at 50% 0%, #151829 0%, #090a0f 70%);
 }
 
 /* Scrollbar styles */
