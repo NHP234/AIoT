@@ -56,7 +56,6 @@ void loop() {
   lapguard::wifi_poll();
   lapguard::alarm_poll();
   lapguard::battery_poll();
-  lapguard::firebase_poll();
 
   const bool wifi_connected = lapguard::wifi_is_connected();
   if (wifi_connected != last_wifi_connected) {
@@ -70,5 +69,7 @@ void loop() {
     lapguard::fsm_handle_event(lapguard::Event::Motion);
     lapguard::firebase_send_alert(delta_g);
   }
+
+  lapguard::firebase_poll();
   delay(10);
 }

@@ -1,6 +1,7 @@
 #include "wifi_mgr.h"
 #include <WiFi.h>
 #include <WiFiManager.h>
+#include <time.h>
 #include "config.h"
 
 namespace lapguard {
@@ -11,6 +12,35 @@ bool was_connected = false;
 
 void wifi_init() {
   WiFi.mode(WIFI_STA);
+  
+  // Kiểm tra nút BOOT (GPIO 0) trong vòng 3 giây sau khi khởi động để xóa WiFi
+  pinMode(0, INPUT_PULLUP);
+  Serial.println("[WIFI] Giu nut BOOT (nut IO0) trong 3 giay toi de xoa WiFi da luu...");
+  bool reset_requested = false;
+  for (int i = 0; i < 30; i++) {
+    // Nháy nhẹ LED xanh (GPIO 26) báo hiệu đang trong cửa sổ chờ
+    pinMode(26, OUTPUT);
+    digitalWrite(26, !digitalRead(26));
+    
+    if (digitalRead(0) == LOW) {
+      reset_requested = true;
+      break;
+    }
+    delay(100);
+  }
+  digitalWrite(26, LOW); // Tắt LED xanh
+  
+  if (reset_requested) {
+    Serial.println("[WIFI] Da phat hien nut BOOT duoc giu! Dang xoa WiFi da luu...");
+    wm.resetSettings();
+    // Nháy LED đỏ (GPIO 27) báo hiệu đã reset thành công
+    pinMode(27, OUTPUT);
+    for (int i = 0; i < 6; i++) {
+      digitalWrite(27, !digitalRead(27));
+      delay(150);
+    }
+    digitalWrite(27, LOW);
+  }
 
   // Styling: Premium Dark & Neon Blue-Violet Theme for Captive Portal
   wm.setCustomHeadElement(
@@ -40,6 +70,25 @@ void wifi_init() {
   if (wm.autoConnect(ap_name.c_str())) {
     Serial.println("[WIFI] Connected successfully!");
     was_connected = true;
+    
+    // Sync NTP time (Vietnam GMT+7)
+    configTime(7 * 3600, 0, "pool.ntp.org", "time.google.com");
+    Serial.print("[TIME] Syncing NTP");
+    time_t now = time(nullptr);
+    int retry = 0;
+    while (now < 1546300800 && retry < 20) {
+      delay(500);
+      Serial.print(".");
+      now = time(nullptr);
+      retry++;
+    }
+    if (now >= 1546300800) {
+      struct tm timeinfo;
+      localtime_r(&now, &timeinfo);
+      Serial.printf("\n[TIME] Current time: %02d:%02d:%02d\n", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+    } else {
+      Serial.println("\n[TIME] NTP Sync Timeout (Check Internet Connection!)");
+    }
   } else {
     Serial.println("[WIFI] Config portal timed out. Operating in OFFLINE mode.");
     was_connected = false;

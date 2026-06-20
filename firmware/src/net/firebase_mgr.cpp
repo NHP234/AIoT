@@ -20,6 +20,97 @@ String command_path = "";
 bool firebase_connected = false;
 unsigned long last_stream_check_ms = 0;
 constexpr unsigned long kStreamCheckIntervalMs = 5000UL;
+constexpr unsigned long kWriteRetryIntervalMs = 500UL;
+constexpr size_t kPendingAlertCapacity = 8;
+
+struct PendingAlert {
+  float delta_g = 0.0f;
+};
+
+PendingAlert pending_alerts[kPendingAlertCapacity];
+size_t pending_alert_head = 0;
+size_t pending_alert_count = 0;
+String pending_status;
+bool status_pending = false;
+unsigned long last_write_attempt_ms = 0;
+
+bool firebase_ready_for_writes() {
+  return firebase_connected && WiFi.isConnected();
+}
+
+void enqueue_alert(float delta_g) {
+  if (pending_alert_count == kPendingAlertCapacity) {
+    pending_alert_head = (pending_alert_head + 1) % kPendingAlertCapacity;
+    --pending_alert_count;
+    Serial.println("[FIREBASE] Alert queue full, dropping oldest alert");
+  }
+
+  const size_t tail = (pending_alert_head + pending_alert_count) % kPendingAlertCapacity;
+  pending_alerts[tail].delta_g = delta_g;
+  ++pending_alert_count;
+  Serial.printf("[FIREBASE] Alert queued (pending=%u)\n", static_cast<unsigned>(pending_alert_count));
+}
+
+bool write_status_now(const String& status_str) {
+  if (!firebase_ready_for_writes()) return false;
+
+  String path = device_path + "/status";
+  if (Firebase.RTDB.setString(&fbdo_write, path.c_str(), status_str.c_str())) {
+    Serial.printf("[FIREBASE] Status updated to: %s\n", status_str.c_str());
+    return true;
+  }
+
+  Serial.printf("[FIREBASE] Status update failed: %s\n", fbdo_write.errorReason().c_str());
+  return false;
+}
+
+bool write_alert_now(float delta_g) {
+  if (!firebase_ready_for_writes()) return false;
+
+  FirebaseJson json;
+  json.add("device_id", device_mac);
+  
+  FirebaseJson server_ts;
+  server_ts.add(".sv", "timestamp");
+  json.add("timestamp", server_ts);
+  
+  json.add("event_type", "MOTION_ALERT");
+  
+  char detail_buf[64];
+  snprintf(detail_buf, sizeof(detail_buf), "Phat hien rung lac manh (delta = %.2fg)", delta_g);
+  json.add("detail", detail_buf);
+  json.add("resolved", false);
+
+  if (Firebase.RTDB.pushJSON(&fbdo_write, "/logs", &json)) {
+    Serial.println("[FIREBASE] Alert log pushed successfully");
+    return true;
+  }
+
+  Serial.printf("[FIREBASE] Alert log push failed: %s\n", fbdo_write.errorReason().c_str());
+  return false;
+}
+
+void process_pending_writes() {
+  if (!firebase_ready_for_writes()) return;
+
+  const unsigned long now = millis();
+  if (now - last_write_attempt_ms < kWriteRetryIntervalMs) {
+    return;
+  }
+  last_write_attempt_ms = now;
+
+  if (status_pending && write_status_now(pending_status)) {
+    status_pending = false;
+  }
+
+  if (pending_alert_count > 0) {
+    const PendingAlert alert = pending_alerts[pending_alert_head];
+    if (write_alert_now(alert.delta_g)) {
+      pending_alert_head = (pending_alert_head + 1) % kPendingAlertCapacity;
+      --pending_alert_count;
+    }
+  }
+}
 }  // namespace
 
 void firebase_init() {
@@ -36,6 +127,12 @@ void firebase_init() {
 
   Firebase.begin(&config, &auth);
   Firebase.reconnectWiFi(true);
+
+  if (!WiFi.isConnected()) {
+    Serial.println("[FIREBASE] WiFi offline, stream start deferred");
+    firebase_connected = false;
+    return;
+  }
 
   if (Firebase.RTDB.beginStream(&fbdo_stream, command_path.c_str())) {
     Serial.println("[FIREBASE] Stream started successfully");
@@ -101,6 +198,8 @@ void firebase_poll() {
     }
   }
 
+  process_pending_writes();
+
   // Periodically update battery & rssi (every 10 seconds)
   static unsigned long last_status_update_ms = 0;
   static bool firebase_low_alert_sent = false;
@@ -141,46 +240,12 @@ void firebase_poll() {
 }
 
 void firebase_send_alert(float delta_g) {
-  if (!WiFi.isConnected()) {
-    Serial.println("[FIREBASE] Cannot send alert - No WiFi");
-    return;
-  }
-
-  // Create a JSON object for the log
-  FirebaseJson json;
-  json.add("device_id", device_mac);
-  
-  // Set server timestamp using Firebase server value ".sv"
-  FirebaseJson server_ts;
-  server_ts.add(".sv", "timestamp");
-  json.add("timestamp", server_ts);
-  
-  json.add("event_type", "MOTION_ALERT");
-  
-  char detail_buf[64];
-  snprintf(detail_buf, sizeof(detail_buf), "Phat hien rung lac manh (delta = %.2fg)", delta_g);
-  json.add("detail", detail_buf);
-  json.add("resolved", false);
-
-  if (Firebase.RTDB.pushJSON(&fbdo_write, "/logs", &json)) {
-    Serial.println("[FIREBASE] Alert log pushed successfully");
-  } else {
-    Serial.printf("[FIREBASE] Alert log push failed: %s\n", fbdo_write.errorReason().c_str());
-  }
-
-  // Also update status node
-  firebase_update_status("TRIGGERED");
+  enqueue_alert(delta_g);
 }
 
 void firebase_update_status(const String& status_str) {
-  if (!WiFi.isConnected()) return;
-
-  String path = device_path + "/status";
-  if (Firebase.RTDB.setString(&fbdo_write, path.c_str(), status_str.c_str())) {
-    Serial.printf("[FIREBASE] Status updated to: %s\n", status_str.c_str());
-  } else {
-    Serial.printf("[FIREBASE] Status update failed: %s\n", fbdo_write.errorReason().c_str());
-  }
+  pending_status = status_str;
+  status_pending = true;
 }
 
 void firebase_update_battery_and_rssi(uint8_t battery, int rssi) {
