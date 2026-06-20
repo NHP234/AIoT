@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { ref, update } from "firebase/database";
 import { db } from "../firebase";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -91,10 +91,10 @@ export default function DeviceManager({ user, devices, activeDevice, setActiveDe
 
   return (
     <div className="space-y-6">
-      <Card className="bg-background/60 backdrop-blur-md border-border/50 shadow-xl">
+      <Card className="bg-background/60 backdrop-blur-md border-border/50 shadow-xl dynamic-card">
         <CardHeader>
           <CardTitle className="text-lg font-bold tracking-tight flex items-center gap-2">
-            <Laptop className="h-5 w-5 text-cyan-400" /> Danh sách thiết bị
+            <Laptop className="h-5 w-5 text-primary" /> Danh sách thiết bị
           </CardTitle>
           <CardDescription>Chọn hoặc hủy liên kết các thiết bị LapGuard của bạn</CardDescription>
         </CardHeader>
@@ -108,17 +108,17 @@ export default function DeviceManager({ user, devices, activeDevice, setActiveDe
               {devices.map((dev) => (
                 <div
                   key={dev.id}
-                  className={`flex justify-between items-center p-3.5 rounded-xl border transition-all duration-300 cursor-pointer ${
+                  className={`flex justify-between items-center p-3.5 rounded-xl border transition-all duration-300 cursor-pointer dynamic-item ${
                     activeDevice === dev.id
-                      ? "border-cyan-500/80 bg-cyan-500/5 shadow-md shadow-cyan-500/5"
-                      : "border-border/40 bg-black/10 hover:bg-black/20 hover:border-border/70"
+                      ? "border-primary bg-primary/5 shadow-sm"
+                      : "border-border/40 bg-black/5 hover:bg-black/10 hover:border-border/70"
                   }`}
                   onClick={() => setActiveDevice(dev.id)}
                 >
                   <div className="space-y-1">
                     <div className="font-semibold text-sm leading-none flex items-center gap-2">
                       <span className={`w-2 h-2 rounded-full ${
-                        dev.status === "TRIGGERED" ? "bg-red-500 animate-pulse" : dev.status === "ARMED" ? "bg-red-400 animate-ping" : "bg-green-400"
+                        dev.status === "TRIGGERED" ? "bg-red-600 animate-pulse" : dev.status === "ARMED" ? "bg-red-500" : "bg-green-500"
                       }`} />
                       {dev.device_name || "Thiết bị không tên"}
                     </div>
@@ -139,7 +139,7 @@ export default function DeviceManager({ user, devices, activeDevice, setActiveDe
         </CardContent>
       </Card>
 
-      <Card className="bg-background/60 backdrop-blur-md border-border/50 shadow-xl">
+      <Card className="bg-background/60 backdrop-blur-md border-border/50 shadow-xl dynamic-card">
         <CardHeader>
           <CardTitle className="text-sm font-bold tracking-tight uppercase flex items-center gap-2 text-muted-foreground">
             <Link2 className="h-4 w-4" /> Liên kết thiết bị mới
@@ -178,7 +178,7 @@ export default function DeviceManager({ user, devices, activeDevice, setActiveDe
           <CardContent className="pt-0">
             <Button
               type="submit"
-              className="w-full bg-cyan-500 hover:bg-cyan-600 text-black font-semibold flex items-center justify-center gap-1.5 rounded-xl"
+              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold flex items-center justify-center gap-1.5 rounded-xl shadow-md dynamic-button"
               disabled={loading}
             >
               {loading ? (

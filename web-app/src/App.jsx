@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { ref, onValue, off } from "firebase/database";
 import { auth, db } from "./firebase";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Shield, LogOut, User, Loader2 } from "lucide-react";
+import { LogOut, User, Loader2 } from "lucide-react";
 
 import Auth from "./components/Auth";
 import Dashboard from "./components/Dashboard";
@@ -19,7 +19,6 @@ export default function App() {
   const [devices, setDevices] = useState([]);
   const [activeDevice, setActiveDevice] = useState("");
   const [logs, setLogs] = useState([]);
-  const [notificationPermission, setNotificationPermission] = useState("default");
 
   // Track Authentication State
   useEffect(() => {
@@ -38,13 +37,8 @@ export default function App() {
 
   // Request Notification Permission
   useEffect(() => {
-    if ("Notification" in window) {
-      setNotificationPermission(Notification.permission);
-      if (Notification.permission === "default") {
-        Notification.requestPermission().then((permission) => {
-          setNotificationPermission(permission);
-        });
-      }
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
     }
   }, [user]);
 

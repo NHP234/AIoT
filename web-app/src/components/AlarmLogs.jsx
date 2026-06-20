@@ -1,4 +1,3 @@
-import React from "react";
 import { ref, update } from "firebase/database";
 import { db } from "../firebase";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,10 +35,10 @@ export default function AlarmLogs({ activeDevice, logs }) {
   };
 
   return (
-    <Card className="bg-background/60 backdrop-blur-md border-border/50 shadow-xl">
+    <Card className="bg-background/60 backdrop-blur-md border-border/50 shadow-xl dynamic-card">
       <CardHeader>
         <CardTitle className="text-lg font-bold tracking-tight flex items-center gap-2">
-          <History className="h-5 w-5 text-cyan-400" /> Nhật ký hoạt động
+          <History className="h-5 w-5 text-primary" /> Nhật ký hoạt động
         </CardTitle>
         <CardDescription>Lịch sử các sự kiện cảnh báo của thiết bị này</CardDescription>
       </CardHeader>
@@ -67,12 +66,12 @@ export default function AlarmLogs({ activeDevice, logs }) {
                       {formatTimestamp(log.timestamp)}
                     </TableCell>
                     <TableCell>
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border shadow-sm ${
                         log.event_type === "MOTION_ALERT"
                           ? "bg-red-500/10 text-red-500 border-red-500/20"
                           : log.event_type === "BATTERY_LOW"
                           ? "bg-amber-500/10 text-amber-500 border-amber-500/20"
-                          : "bg-cyan-500/10 text-cyan-500 border-cyan-500/20"
+                          : "bg-primary/10 text-primary border-primary/20"
                       }`}>
                         {log.event_type === "MOTION_ALERT" ? (
                           <AlertTriangle className="h-3 w-3" />
@@ -93,11 +92,11 @@ export default function AlarmLogs({ activeDevice, logs }) {
                     </TableCell>
                     <TableCell>
                       {log.resolved ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-400">
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-500">
                           <CheckCircle2 className="h-3 w-3" /> Đã xử lý
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-400">
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-500">
                           <AlertTriangle className="h-3 w-3" /> Chưa xử lý
                         </span>
                       )}
@@ -107,7 +106,7 @@ export default function AlarmLogs({ activeDevice, logs }) {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="h-7 px-3 text-xs border-border/60 hover:bg-green-500 hover:text-black hover:border-green-500 rounded-lg transition-all"
+                          className="h-7 px-3 text-xs border-border/60 hover:bg-green-600 hover:text-white hover:border-green-600 rounded-lg dynamic-button"
                           onClick={() => handleResolve(log.id)}
                         >
                           Giải quyết

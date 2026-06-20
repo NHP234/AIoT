@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
 import { ref, set } from "firebase/database";
 import { auth, db } from "../firebase";
@@ -57,11 +57,11 @@ export default function Auth() {
 
   return (
     <div className="flex items-center justify-center min-h-[75vh] px-4">
-      <Card className="w-full max-w-[420px] bg-white/80 dark:bg-background/60 backdrop-blur-lg border-border/50 shadow-2xl transition-all duration-500">
+      <Card className="w-full max-w-[420px] bg-white/80 dark:bg-card/90 backdrop-blur-lg border-border/50 shadow-2xl dynamic-card">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-2">
-            <div className="p-3 rounded-full bg-cyan-500/10 dark:bg-primary/10 text-primary">
-              <Shield className="h-8 w-8 text-cyan-600 dark:text-cyan-400" />
+            <div className="p-3 rounded-full bg-primary/10 text-primary">
+              <Shield className="h-8 w-8 text-primary" />
             </div>
           </div>
           <CardTitle className="text-2xl font-bold tracking-tight">
@@ -126,7 +126,7 @@ export default function Auth() {
           <CardFooter className="flex flex-col space-y-4">
             <Button 
               type="submit" 
-              className="w-full bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-600 hover:to-purple-700 text-white font-semibold shadow-lg shadow-cyan-500/10 transition-all duration-300"
+              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-md dynamic-button"
               disabled={loading}
             >
               {loading ? (
@@ -143,7 +143,7 @@ export default function Auth() {
               {isSignUp ? "Đã có tài khoản? " : "Chưa có tài khoản? "}
               <span 
                 onClick={() => { setIsSignUp(!isSignUp); setError(""); }}
-                className="text-cyan-600 dark:text-cyan-400 hover:underline cursor-pointer font-semibold"
+                className="text-primary hover:underline cursor-pointer font-semibold"
               >
                 {isSignUp ? "Đăng nhập" : "Đăng ký"}
               </span>

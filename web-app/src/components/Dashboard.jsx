@@ -1,12 +1,21 @@
-import React from "react";
+import { useEffect, useState } from "react";
 import { ref, update } from "firebase/database";
 import { db } from "../firebase";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Shield, ShieldAlert, VolumeX, Battery, Wifi, Clock, AlertTriangle } from "lucide-react";
+import { Shield, ShieldAlert, VolumeX, Battery, Wifi, Clock } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Dashboard({ activeDevice, deviceData }) {
+  const [nowMs, setNowMs] = useState(0);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNowMs(Date.now());
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   if (!activeDevice || !deviceData) {
     return (
       <Card className="bg-background/60 backdrop-blur-md border-border/50 shadow-xl min-h-[350px] flex items-center justify-center">
@@ -60,14 +69,14 @@ export default function Dashboard({ activeDevice, deviceData }) {
 
   const isDeviceOffline = () => {
     if (!last_seen) return true;
-    const now = Date.now();
-    return (now - last_seen) > 30000;
+    if (!nowMs) return false;
+    return (nowMs - last_seen) > 30000;
   };
 
   const currentStatus = isDeviceOffline() ? "OFFLINE" : status;
 
   return (
-    <Card className={`bg-background/60 backdrop-blur-md border-border/50 shadow-xl overflow-hidden ${
+    <Card className={`bg-background/60 backdrop-blur-md border-border/50 shadow-xl overflow-hidden dynamic-card ${
       currentStatus === "TRIGGERED" ? "app-triggered" : ""
     }`}>
       <CardHeader className="border-b border-border/30 pb-4">
@@ -84,14 +93,14 @@ export default function Dashboard({ activeDevice, deviceData }) {
       <CardContent className="flex flex-col items-center justify-center py-10 text-center">
         {/* Status circle visualizer */}
         <div className="relative w-[190px] height-[190px] flex items-center justify-center mb-8">
-          {/* Breathing outer glow */}
+          {/* Status Indicator Ring */}
           <div className={`absolute w-[180px] h-[180px] rounded-full border-4 transition-all duration-1000 ${
             currentStatus === "DISARMED" 
-              ? "border-green-500 shadow-[0_0_20px_rgba(34,197,94,0.2)]"
+              ? "border-green-500 shadow-sm"
               : currentStatus === "ARMED" 
-              ? "border-red-500 animate-pulse" 
+              ? "border-red-500 shadow-sm" 
               : currentStatus === "TRIGGERED" 
-              ? "border-red-600 animate-ping opacity-75"
+              ? "border-red-600 animate-pulse shadow-md"
               : "border-muted/50 shadow-inner"
           }`} />
           
@@ -101,19 +110,19 @@ export default function Dashboard({ activeDevice, deviceData }) {
             ) : (
               <Shield className={`h-9 w-9 mb-1 ${
                 currentStatus === "ARMED" 
-                  ? "text-red-400 animate-pulse" 
+                  ? "text-red-500" 
                   : currentStatus === "DISARMED" 
-                  ? "text-green-400" 
+                  ? "text-green-500" 
                   : "text-muted-foreground"
               }`} />
             )}
             <span className={`text-xl font-black tracking-wide uppercase ${
               currentStatus === "DISARMED"
-                ? "text-green-400"
+                ? "text-green-500"
                 : currentStatus === "ARMED"
-                ? "text-red-400"
+                ? "text-red-500"
                 : currentStatus === "TRIGGERED"
-                ? "text-red-500 font-extrabold animate-pulse"
+                ? "text-red-600 font-extrabold animate-pulse"
                 : "text-muted-foreground"
             }`}>
               {currentStatus === "DISARMED"
@@ -132,7 +141,7 @@ export default function Dashboard({ activeDevice, deviceData }) {
         <div className="grid grid-cols-2 gap-4 w-full max-w-[420px]">
           <Button
             size="lg"
-            className="bg-red-500 hover:bg-red-600 text-black font-semibold flex items-center justify-center gap-1.5 rounded-xl shadow-lg shadow-red-500/10"
+            className="bg-red-600 hover:bg-red-700 text-white font-semibold flex items-center justify-center gap-1.5 rounded-xl shadow-sm dynamic-button"
             onClick={() => sendCommand("ARM")}
             disabled={currentStatus === "OFFLINE"}
           >
@@ -141,7 +150,7 @@ export default function Dashboard({ activeDevice, deviceData }) {
           <Button
             size="lg"
             variant="outline"
-            className="border-border/60 hover:bg-black/10 text-foreground font-semibold flex items-center justify-center gap-1.5 rounded-xl"
+            className="border-border/60 hover:bg-muted text-foreground font-semibold flex items-center justify-center gap-1.5 rounded-xl dynamic-button"
             onClick={() => sendCommand("DISARM")}
             disabled={currentStatus === "OFFLINE"}
           >
@@ -153,7 +162,7 @@ export default function Dashboard({ activeDevice, deviceData }) {
           <Button
             variant="destructive"
             size="lg"
-            className="w-full max-w-[420px] mt-4 font-bold flex items-center justify-center gap-1.5 rounded-xl animate-bounce"
+            className="w-full max-w-[420px] mt-4 font-bold flex items-center justify-center gap-1.5 rounded-xl animate-pulse bg-red-600 hover:bg-red-700 shadow-md dynamic-button"
             onClick={() => sendCommand("SILENCE")}
           >
             <VolumeX className="h-5 w-5" /> TẮT CÒI BÁO ĐỘNG (SILENCE)
@@ -162,9 +171,9 @@ export default function Dashboard({ activeDevice, deviceData }) {
 
         {/* Information Grid Widgets */}
         <div className="w-full max-w-[420px] mt-10 space-y-3">
-          <div className="flex justify-between items-center p-3.5 rounded-xl border border-border/30 bg-black/10 dark:bg-black/20 text-sm">
+          <div className="flex justify-between items-center p-3.5 rounded-xl border border-border/30 bg-black/5 dark:bg-black/20 text-sm dynamic-item">
             <span className="text-muted-foreground font-medium flex items-center gap-2">
-              <Battery className="h-4 w-4 text-cyan-400" /> Dung lượng pin
+              <Battery className="h-4 w-4 text-primary" /> Dung lượng pin
             </span>
             <div className="flex items-center gap-2.5">
               <span className="font-semibold">{battery_percent}%</span>
@@ -177,9 +186,9 @@ export default function Dashboard({ activeDevice, deviceData }) {
             </div>
           </div>
 
-          <div className="flex justify-between items-center p-3.5 rounded-xl border border-border/30 bg-black/10 dark:bg-black/20 text-sm">
+          <div className="flex justify-between items-center p-3.5 rounded-xl border border-border/30 bg-black/5 dark:bg-black/20 text-sm dynamic-item">
             <span className="text-muted-foreground font-medium flex items-center gap-2">
-              <Wifi className="h-4 w-4 text-cyan-400" /> Sóng WiFi
+              <Wifi className="h-4 w-4 text-primary" /> Sóng WiFi
             </span>
             <div className="flex items-center gap-2.5">
               <span className="font-semibold">{wifi_rssi} dBm</span>
@@ -188,7 +197,7 @@ export default function Dashboard({ activeDevice, deviceData }) {
                   <div
                     key={bar}
                     className={`w-[3px] rounded-sm transition-all duration-300 ${
-                      bar <= signalBars ? "bg-cyan-400" : "bg-muted"
+                      bar <= signalBars ? "bg-primary" : "bg-muted"
                     }`}
                     style={{ height: `${bar * 3.5}px` }}
                   />
@@ -197,9 +206,9 @@ export default function Dashboard({ activeDevice, deviceData }) {
             </div>
           </div>
 
-          <div className="flex justify-between items-center p-3.5 rounded-xl border border-border/30 bg-black/10 dark:bg-black/20 text-sm">
+          <div className="flex justify-between items-center p-3.5 rounded-xl border border-border/30 bg-black/5 dark:bg-black/20 text-sm dynamic-item">
             <span className="text-muted-foreground font-medium flex items-center gap-2">
-              <Clock className="h-4 w-4 text-cyan-400" /> Kết nối cuối cùng
+              <Clock className="h-4 w-4 text-primary" /> Kết nối cuối cùng
             </span>
             <span className="font-semibold">{formatLastSeen(last_seen)}</span>
           </div>
