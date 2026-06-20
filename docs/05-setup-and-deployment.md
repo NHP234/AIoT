@@ -3,42 +3,6 @@
 ## Mục lục
 
 - [1. Yêu cầu trước khi bắt đầu](#1-yêu-cầu-trước-khi-bắt-đầu)
-- [2. Phần A - Tạo Telegram Bot](#2-phần-a---tạo-telegram-bot)
-- [3. Phần B - Cài môi trường phát triển](#3-phần-b---cài-môi-trường-phát-triển)
-- [4. Phần C - Lắp mạch phần cứng](#4-phần-c---lắp-mạch-phần-cứng)
-- [5. Phần D - Cấu hình và nạp firmware](#5-phần-d---cấu-hình-và-nạp-firmware)
-- [6. Phần E - Kiểm thử lần đầu](#6-phần-e---kiểm-thử-lần-đầu)
-- [7. Phần F - Triển khai thực tế](#7-phần-f---triển-khai-thực-tế)
-- [8. Troubleshooting](#8-troubleshooting)
-- [9. Checklist bàn giao](#9-checklist-bàn-giao)
-
----
-
-## 1. Yêu cầu trước khi bắt đầu
-
-### Phần cứng
-
-Chuẩn bị đầy đủ linh kiện theo [02-hardware.md](02-hardware.md#2-bảng-vật-tư-bill-of-materials) + dụng cụ:
-
-- Mỏ hàn 30-40W + thiếc + flux.
-- Kìm cắt, kìm tuốt dây.
-- Đồng hồ vạn năng (để đo điện áp pin, thông mạch).
-- Cáp USB Micro-B (cho ESP32) và cáp USB-C (cho TP4056).
-
-### Phần mềm
-
-- Máy tính chạy Windows 10/11, macOS, hoặc Linux.
-- VSCode + PlatformIO extension.
-- Git (để clone repo).
-- Trình duyệt web để dùng Telegram web.
-- Smartphone đã cài **Telegram** và đăng nhập.
-- WiFi 2.4 GHz có internet (ESP32 không kết nối được 5 GHz).
-
-# 05 - Cài đặt và triển khai
-
-## Mục lục
-
-- [1. Yêu cầu trước khi bắt đầu](#1-yêu-cầu-trước-khi-bắt-đầu)
 - [2. Phần A - Thiết lập dự án Firebase & React Web App](#2-phần-a---thiết-lập-dự-án-firebase--react-web-app)
 - [3. Phần B - Cài môi trường phát triển](#3-phần-b---cài-môi trường-phát-triển)
 - [4. Phần C - Lắp mạch phần cứng](#4-phần-c---lắp-mạch-phần-cứng)
@@ -66,8 +30,8 @@ Chuẩn bị đầy đủ linh kiện theo [02-hardware.md](02-hardware.md#2-b�
 - Máy tính chạy Windows 10/11, macOS, hoặc Linux.
 - VSCode + PlatformIO extension.
 - Git (để clone repo).
-- Trình duyệt web để dùng Telegram web.
-- Smartphone đã cài **Telegram** và đăng nhập.
+- Trình duyệt web hiện đại để chạy React Web App.
+- Tài khoản Firebase/Google để cấu hình Realtime Database và Authentication.
 - WiFi 2.4 GHz có internet (ESP32 không kết nối được 5 GHz).
 
 ### Kiến thức nền
@@ -173,7 +137,7 @@ Lắp từng khối, test từng khối. Đừng lắp hết rồi test lần cu
 3. **Bước 3 - Cảm biến MPU6050**:
    - Nối 4 chân: VCC 3V3, GND, SDA 21, SCL 22.
    - Chạy sketch test `Wire.h` scan I2C, phải thấy thiết bị ở địa chỉ `0x68`.
-   - Nối thêm INT -> GPIO 15 nếu muốn dùng hardware interrupt.
+   - Nối thêm INT -> GPIO 13 nếu muốn dùng hardware interrupt sau này.
 
 4. **Bước 4 - SW-420 (Trì hoãn - Tuỳ chọn)**:
    - Bước này đã được trì hoãn sang phiên bản sau. Để trống chân GPIO 14 làm chân dự phòng.

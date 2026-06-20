@@ -12,7 +12,7 @@ Tài liệu này cung cấp sơ đồ nối dây chi tiết và nhanh chóng ph�
 | | GND | **GND** | Nguồn cấp | 0V | GND chung toàn mạch |
 | | SCL | **GPIO 22** | I2C SCL | 3.3V | Chân CLK của bus I2C |
 | | SDA | **GPIO 21** | I2C SDA | 3.3V | Chân DATA của bus I2C |
-| | INT | **GPIO 15** | Input Interrupt | 3.3V | Báo ngắt khi có chuyển động |
+| | INT | **GPIO 13** | Input Interrupt | 3.3V | Báo ngắt khi có chuyển động |
 | | AD0 | **GND** | Địa chỉ I2C | 0V | Đặt địa chỉ I2C cố định là `0x68` |
 | **Còi báo (Buzzer)** | VCC | **VIN** (hoặc 5V) | Nguồn cấp | 5.0V | Nguồn lấy sau mạch tăng áp MT3608 |
 | *(Module 3 chân)* | GND | **GND** | Nguồn cấp | 0V | GND chung toàn mạch |
@@ -51,7 +51,7 @@ Tài liệu này cung cấp sơ đồ nối dây chi tiết và nhanh chóng ph�
 2. Nối chân **GND** của MPU6050 vào chân **GND** của ESP32.
 3. Nối chân **SCL** của MPU6050 vào chân **GPIO 22** của ESP32.
 4. Nối chân **SDA** của MPU6050 vào chân **GPIO 21** của ESP32.
-5. Nối chân **INT** của MPU6050 vào chân **GPIO 15** của ESP32.
+5. Nối chân **INT** của MPU6050 vào chân **GPIO 13** của ESP32.
 6. Nối chân **AD0** của MPU6050 vào **GND** (để khóa địa chỉ I2C ở `0x68`).
 
 ### Khối Báo động (Còi & LED)

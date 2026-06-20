@@ -22,9 +22,9 @@ Hệ thống được chia thành 5 tầng, từ vật lý lên người dùng:
 flowchart TB
     L1[Layer 1 - Physical: MPU6050, Buzzer, LED, Pin (Cảm biến rung SW-420 làm option bổ sung sau)]
     L2[Layer 2 - Driver: I2C, GPIO, ADC, PWM]
-    L3[Layer 3 - Application Logic: FSM, Motion detector, Alarm manager, Auth]
-    L4[Layer 4 - Network: WiFi, HTTPS, Telegram Bot API]
-    L5[Layer 5 - User: Telegram app tren smartphone]
+    L3[Layer 3 - Application Logic: FSM, Motion detector, Alarm manager]
+    L4[Layer 4 - Network: WiFi, HTTPS, Firebase Realtime Database]
+    L5[Layer 5 - User: React Web App / PWA]
 
     L1 --> L2
     L2 --> L3
@@ -53,7 +53,7 @@ flowchart LR
 
     subgraph Cloud[Firebase Cloud]
         FB[(Firebase Realtime Database)]
-        FCM[Firebase Cloud Messaging]
+        FCM[Firebase Cloud Messaging<br/>future push option]
     end
 
     subgraph User[Nguoi dung]
@@ -62,8 +62,8 @@ flowchart LR
 
     MCU <-->|WebSocket Realtime Sync| FB
     APP <-->|Realtime SDK| FB
-    FB -->|Trigger Web Push| FCM
-    FCM -->|Push Notification| APP
+    FB -->|Realtime event| APP
+    FCM -.->|Web Push future option| APP
 ```
 
 Kiến trúc này sử dụng dịch vụ đám mây Firebase Realtime Database làm trung tâm điều phối trạng thái thời gian thực qua giao thức WebSockets. Người dùng và thiết bị ESP32 đồng bộ dữ liệu song hướng gần như tức thời.
@@ -72,7 +72,7 @@ Kiến trúc này sử dụng dịch vụ đám mây Firebase Realtime Database 
 
 ### Luồng 1: Đọc cảm biến (mọi thời điểm)
 
-1. Task `SensorTask` chạy chu kỳ 20 ms (50 Hz).
+1. Vòng `loop()` gọi `motion_poll()` khi hệ thống đang armed; module motion tự giới hạn chu kỳ đọc 20 ms (50 Hz).
 2. Đọc `ax, ay, az` từ MPU6050 qua I2C.
 3. Tính `|a| = sqrt(ax^2 + ay^2 + az^2)`.
 4. Tính `delta = |a| - 9.81` (trừ trọng lực).
@@ -94,12 +94,12 @@ Kiến trúc này sử dụng dịch vụ đám mây Firebase Realtime Database 
 2. Chuyển sang state `TRIGGERED`, bật còi và LED đỏ.
 3. ESP32 gọi `firebase_send_alert(delta_g)`.
 4. Cập nhật status thành `"TRIGGERED"` và ghi sự kiện vào danh sách `/logs` trên Firebase.
-5. Firebase Database Trigger sẽ gọi Firebase Cloud Messaging (FCM) để gửi thông báo đẩy (Web Push) đến trình duyệt/điện thoại người dùng.
-6. Nếu mất WiFi, thiết bị lưu tạm sự kiện vào RAM và đẩy lên Firebase đồng bộ khi có kết nối mạng trở lại.
+5. React Web App đang mở nhận thay đổi realtime và hiển thị toast/native notification của trình duyệt.
+6. Nếu mất WiFi, thiết bị lưu tạm tối đa 8 cảnh báo motion vào RAM và đẩy lên Firebase khi có kết nối mạng trở lại. Web Push qua FCM là hướng nâng cấp sau.
 
 ### Luồng 4: Đồng bộ trạng thái định kỳ
 
-1. Thiết bị ESP32 chạy một Task nền `FirebaseTask` định kỳ (ví dụ mỗi 10 giây).
+1. `firebase_poll()` chạy trong vòng `loop()` chính, xử lý stream command và hàng đợi ghi Firebase.
 2. Đo và cập nhật điện áp pin (`battery_percent`), tín hiệu sóng mạng (`wifi_rssi`) và timestamp (`last_seen`) lên Firebase để người dùng tiện theo dõi.
 
 ### 3.4 Thiết kế cây dữ liệu JSON trên Firebase Realtime Database
@@ -186,7 +186,7 @@ Các state và ý nghĩa:
 | TRIGGERED | `cmd_disarm` | DISARMED | Tắt còi, LED xanh sáng liên tục, cập nhật trạng thái "DISARMED" |
 | TRIGGERED | `timer_60s` | TRIGGERED | Tắt còi tự động (chống tiếng ồn lâu), giữ nguyên trạng thái giám sát |
 | Bất kỳ | `wifi_lost` | OFFLINE | Nhớ `prev_state`, vẫn tiếp tục giám sát và báo động tại chỗ |
-| OFFLINE | `wifi_connected` | `prev_state` | Tự động đồng bộ và đẩy toàn bộ sự kiện lịch sử offline lên Firebase |
+| OFFLINE | `wifi_connected` | `prev_state` | Tự động thử đồng bộ các cảnh báo motion còn trong hàng đợi RAM lên Firebase |
 
 ## 6. Thuật toán phát hiện chuyển động
 
@@ -236,7 +236,7 @@ Tham số mặc định:
 ### Debounce báo động
 
 - Sau khi vào TRIGGERED, khoá không nhận thêm motion_event trong 10 giây đầu.
-- Lý do: còi đang kêu làm ESP32 rung theo, tránh spam Telegram.
+- Lý do: còi đang kêu làm ESP32 rung theo, tránh spam cảnh báo Firebase.
 
 ## 7. Mô hình bảo mật
 
@@ -275,7 +275,7 @@ Tham số mặc định:
 | Tình huống | Giải pháp |
 |------------|-----------|
 | MPU6050/MPU6500 không phản hồi I2C khi boot | Báo lỗi qua Serial + LED đỏ nhấp nháy SOS, dừng setup, không enter loop |
-| WiFi ngắt giữa chừng | Chuyển vào state OFFLINE, lưu các sự kiện chuyển động vào RAM buffer (giới hạn 20), tự động thử kết nối lại mỗi 10 giây |
+| WiFi ngắt giữa chừng | Chuyển vào state OFFLINE, lưu tối đa 8 cảnh báo motion trong RAM và đẩy lại khi Firebase stream kết nối lại |
 | Firebase API timeout | Tự động thử lại và duy trì kết nối WebSocket chạy ngầm |
 | Pin yếu (< 3.4V) | Gửi thông báo đẩy "pin yếu" lên Web App 1 lần duy nhất |
 | Pin cực yếu (< 3.0V) | Lưu state hiện tại vào NVS, shutdown an toàn |
@@ -304,7 +304,7 @@ sequenceDiagram
     L->>B: Buzzer ON
     B-->>T: HÚ HÚ HÚ (~85dB)
     L->>FB: Ghi nhận trạng thái TRIGGERED và ghi log
-    FB-->>P: Đẩy thông báo Push Notification qua FCM
+    FB-->>P: Realtime update, Web App hiển thị notification nếu đang mở
     P->>FB: Nhấn nút DISARM trên App (Ghi lệnh DISARM)
     FB->>L: Đẩy dữ liệu lệnh qua WebSocket (ngay lập tức)
     L->>L: FSM: TRIGGERED -> DISARMED
@@ -327,8 +327,8 @@ sequenceDiagram
     T->>L: Nhấc laptop đi
     L->>L: Phát hiện chuyển động
     Note over L: Vẫn chuyển TRIGGERED local, còi hú vang
-    Note over L: Lưu sự kiện chuyển động vào RAM
+    Note over L: Lưu cảnh báo motion vào hàng đợi RAM
     Note over L: Sau 2 phút, WiFi tự động kết nối lại
-    L->>FB: Đẩy toàn bộ logs lưu trong RAM lên Database
+    L->>FB: Đẩy các alert còn trong hàng đợi RAM lên Database
     FB-->>P: Cập nhật nhật ký sự kiện lịch sử trên Web App
 ```

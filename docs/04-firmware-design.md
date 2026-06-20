@@ -6,35 +6,9 @@
 - [2. Danh sách thư viện](#2-danh-sách-thư-viện)
 - [3. Cấu trúc thư mục code](#3-cấu-trúc-thư-mục-code)
 - [4. Mô tả từng module](#4-mô-tả-từng-module)
-- [5. Mô hình đa luồng (FreeRTOS tasks)](#5-mô-hình-đa-luồng-freertos-tasks)
-- [6. Đặc tả lệnh Telegram Bot](#6-đặc-tả-lệnh-telegram-bot)
-- [7. Định dạng tin nhắn cảnh báo](#7-định-dạng-tin-nhắn-cảnh-báo)
-- [8. Cấu hình qua file secrets](#8-cấu-hình-qua-file-secrets)
-- [9. Cấu hình PlatformIO](#9-cấu-hình-platformio)
-- [10. Quy ước code](#10-quy-ước-code)
-
----
-
-## 1. Framework và công cụ
-
-- **Framework**: Arduino-ESP32 (arduino-espressif32 core, phiên bản >= 2.0.14).
-- **Build system**: **PlatformIO** (khuyến nghị) hoặc Arduino IDE 2.x.
-- **Ngôn ngữ**: C++ 11, style tương tự Arduino.
-- **IDE**: VSCode + PlatformIO extension.
-- **Debug**: Serial Monitor 115200 baud, thư viện `esp_log` khi cần log có level.
-
-Lý do chọn PlatformIO thay vì Arduino IDE:
-# 04 - Thiết kế firmware
-
-## Mục lục
-
-- [1. Framework và công cụ](#1-framework-và-công-cụ)
-- [2. Danh sách thư viện](#2-danh-sách-thư-viện)
-- [3. Cấu trúc thư mục code](#3-cấu-trúc-thư-mục-code)
-- [4. Mô tả từng module](#4-mô-tả-từng-module)
-- [5. Mô hình đa luồng (FreeRTOS tasks)](#5-mô-hình-đa-luồng-freertos-tasks)
-- [6. Đặc tả lệnh Telegram Bot](#6-đặc-tả-lệnh-telegram-bot)
-- [7. Định dạng tin nhắn cảnh báo](#7-định-dạng-tin-nhắn-cảnh-báo)
+- [5. Mô hình vòng lặp và hàng đợi Firebase](#5-mô-hình-vòng-lặp-và-hàng-đợi-firebase)
+- [6. Đặc tả cấu trúc dữ liệu và đồng bộ lệnh](#6-đặc-tả-cấu-trúc-dữ-liệu-và-đồng-bộ-lệnh-firebase-database)
+- [7. Định dạng gói tin nhật ký báo động](#7-định-dạng-gói-tin-nhật-ký-báo-động-json-logs)
 - [8. Cấu hình qua file secrets](#8-cấu-hình-qua-file-secrets)
 - [9. Cấu hình PlatformIO](#9-cấu-hình-platformio)
 - [10. Quy ước code](#10-quy-ước-code)
@@ -78,15 +52,16 @@ Lý do chọn PlatformIO thay vì Arduino IDE:
 firmware/
 ├── platformio.ini                     # cau hinh PlatformIO
 ├── README.md                          # huong dan chay firmware
+├── include/
+│   └── config.h                       # hang so cau hinh (threshold, pin GPIO)
 ├── src/
 │   ├── main.cpp                       # entry point, setup() + loop()
-│   ├── config.h                       # hang so cau hinh (threshold, pin GPIO)
 │   ├── secrets.example.h              # mau cho secrets.h
 │   ├── secrets.h                      # (KHONG commit) Firebase keys
 │   ├── fsm/
 │   │   ├── fsm.h
 │   │   └── fsm.cpp                    # finite state machine
-│   ├── sensor/
+│   ├── motion/
 │   │   ├── motion.h
 │   │   └── motion.cpp                 # MPU6050/6500
 │   ├── alarm/
@@ -109,9 +84,9 @@ firmware/
 
 Chịu trách nhiệm:
 
-- Khởi tạo Serial, GPIO, I2C, cảm biến, WiFiManager, kết nối Firebase, NVS.
-- Tạo các FreeRTOS task: `SensorTask`, `FirebaseTask`, `FSMTask`, `BatteryTask`.
-- Trong `loop()` chỉ feed watchdog và delay nhỏ.
+- Khởi tạo Serial, GPIO, I2C, cảm biến, WiFiManager và Firebase.
+- Gọi `wifi_poll()`, `alarm_poll()`, `battery_poll()`, `motion_poll()` và `firebase_poll()` trong vòng `loop()` chính.
+- Đọc motion trước khi xử lý hàng đợi Firebase để giảm nguy cơ thao tác mạng làm trễ phát hiện chuyển động.
 
 ### `config.h`
 
@@ -122,7 +97,7 @@ Hằng số cấu hình public cho toàn project:
 #define PIN_BUZZER      25
 #define PIN_LED_GREEN   26
 #define PIN_LED_RED     27
-#define PIN_MPU_INT     15
+#define PIN_MPU_INT     13
 #define PIN_BATTERY_ADC 34
 
 // I2C
@@ -151,13 +126,13 @@ Hằng số cấu hình public cho toàn project:
 - Callback `on_enter_state(State s)` để gọi bật/tắt còi, LED, gửi notification.
 - Biến `current_state` bảo vệ bằng mutex hoặc `portENTER_CRITICAL` (vì truy cập từ nhiều task).
 
-### `sensor/motion.{h,cpp}`
+### `motion/motion.{h,cpp}`
 
 - Tự nhận diện MPU6050 (`WHO_AM_I=0x68`) hoặc MPU6500 (`0x70`), cấu hình ở
   `+-4g`, gyro `+-500 deg/s`, filter DLPF khoảng 44Hz.
 - Cấu hình MPU6050 interrupt motion detection hardware (tuỳ chọn nâng cao).
 - Hàm `motion_sample()`: đọc gia tốc, tính delta, đẩy vào ring buffer, trả về `true` nếu vượt ngưỡng trong N mẫu.
-- Hàm `motion_check()` được `SensorTask` gọi định kỳ, phát `EVT_MOTION` tới FSM.
+- Hàm `motion_poll()` tự giới hạn chu kỳ đọc 20 ms, trả về `true` khi motion vượt ngưỡng trong đủ số mẫu liên tiếp.
 
 ### `alarm/alarm.{h,cpp}`
 
@@ -176,31 +151,35 @@ Hằng số cấu hình public cho toàn project:
 ### `net/firebase_mgr.{h,cpp}`
 
 - `firebase_init()`: khởi tạo cấu hình kết nối Firebase Realtime Database bằng Token/API Key.
-- `firebase_sync()`: thiết lập WebSocket lắng nghe nhánh `/devices/<MAC>/command`. Khi nhận được các lệnh `"ARM"`, `"DISARM"`, `"SILENCE"`, nó đẩy sự kiện tương ứng vào hàng đợi FSM và ghi đè lại giá trị `"NONE"` lên Firebase.
-- `firebase_send_alert(float delta)`: Ghi nhận sự kiện báo động lên nhánh `/logs` và cập nhật `status = "TRIGGERED"`.
-- `firebase_update_status()`: Định kỳ đồng bộ thông tin pin và cường độ sóng mạng (RSSI) lên Firebase.
+- `firebase_poll()`: duy trì stream lắng nghe nhánh `/devices/<MAC>/command`, xử lý lệnh `"ARM"`, `"DISARM"`, `"SILENCE"` và ghi đè lại `"NONE"` sau khi nhận lệnh.
+- `firebase_send_alert(float delta)`: đưa cảnh báo motion vào hàng đợi RAM; `firebase_poll()` sẽ đẩy lên `/logs` khi Firebase sẵn sàng.
+- `firebase_update_status()`: chỉ lưu trạng thái mới nhất vào hàng đợi nội bộ, tránh gọi mạng trực tiếp từ FSM.
+- `firebase_update_battery_and_rssi()`: đồng bộ pin, RSSI và `last_seen` định kỳ.
 
 ### `power/battery.{h,cpp}`
 
 - `battery_read_mv()`: đọc ADC1 trên GPIO 34, nhân hệ số phân áp, trả về mV.
-- Chạy mỗi 60s trong `BatteryTask`.
-- Nếu dưới `BAT_LOW_MV` và chưa gửi cảnh báo -> Cập nhật trạng thái pin yếu lên Firebase để kích hoạt Web Push cảnh báo cho người dùng.
+- `battery_poll()` đọc lại mỗi 60s trong vòng `loop()` chính.
+- Nếu dưới `BAT_LOW_MV` và chưa gửi cảnh báo -> ghi log pin yếu lên Firebase khi đang có kết nối.
 - Nếu dưới `BAT_CRITICAL_MV` -> lưu state, gửi cảnh báo khẩn cấp rồi `esp_deep_sleep_start()`.
 
-## 5. Mô hình đa luồng (FreeRTOS tasks)
+## 5. Mô hình vòng lặp và hàng đợi Firebase
 
-ESP32 dual-core, chia task để tránh I/O chặn:
+Firmware hiện dùng vòng `loop()` Arduino, nhưng đã tách các thao tác Firebase khỏi đường xử lý FSM/motion:
 
-| Task | Core | Priority | Stack | Chu kỳ | Trách nhiệm |
-|------|------|----------|-------|--------|-------------|
-| `SensorTask` | 1 | 5 | 4 KB | 20 ms | Đọc cảm biến, kiểm tra motion |
-| `FirebaseTask` | 0 | 3 | 10 KB | sự kiện (WebSocket) | Lắng nghe command từ Firebase, gửi trạng thái |
-| `FSMTask` | 1 | 4 | 4 KB | event-driven (queue) | Xử lý sự kiện, chuyển state |
-| `BatteryTask` | 0 | 1 | 2 KB | 60 s | Đọc pin |
+| Thành phần | Chu kỳ | Trách nhiệm |
+|------------|--------|-------------|
+| `motion_poll()` | 20 ms nội bộ khi armed | Đọc MPU6050/6500, lọc delta, phát hiện motion |
+| `alarm_poll()` | mỗi vòng loop | Điều khiển LED/còi và timeout báo động |
+| `battery_poll()` | 60 s | Đọc điện áp pin |
+| `firebase_poll()` | mỗi vòng loop | Duy trì stream command, xử lý hàng đợi ghi Firebase |
 
-Giao tiếp giữa task qua **FreeRTOS queue**:
+Các thao tác ghi Firebase được gom vào hàng đợi nội bộ:
 
-- `xEventQueue`: chứa `Event` enum, SensorTask & FirebaseTask đẩy vào, FSMTask consume.
+- Status: chỉ giữ trạng thái mới nhất cần đồng bộ.
+- Motion alert: lưu tối đa 8 alert trong RAM để gửi lại khi WiFi/Firebase sẵn sàng.
+
+Hướng nâng cấp sau: tách `SensorTask`, `FirebaseTask`, `FSMTask` bằng FreeRTOS queue nếu cần độ trễ ổn định hơn dưới tải mạng cao.
 
 ## 6. Đặc tả cấu trúc dữ liệu và đồng bộ lệnh (Firebase Database)
 

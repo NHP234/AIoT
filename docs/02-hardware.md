@@ -135,7 +135,7 @@ flowchart TB
 |-----------|------------|------|---------|
 | I2C SDA (MPU6050) | GPIO 21 | I/O | Chân I2C mặc định của ESP32 |
 | I2C SCL (MPU6050) | GPIO 22 | I/O | Chân I2C mặc định của ESP32 |
-| MPU6050 INT | GPIO 15 | Input | Ngắt khi có motion, pull-up nội |
+| MPU6050 INT | GPIO 13 | Input | Ngắt khi có motion, pull-up nội (dự phòng, firmware hiện đọc polling) |
 | Chân dự phòng (SW-420) | GPIO 14 | Input | Để trống (Option v2) |
 | Buzzer IN | GPIO 25 | Output | Active high |
 | LED xanh (OK) | GPIO 26 | Output | Nối qua điện trở 220 Ohm |
@@ -158,7 +158,7 @@ MPU6050 VCC -> ESP32 3V3
 MPU6050 GND -> ESP32 GND
 MPU6050 SCL -> ESP32 GPIO 22
 MPU6050 SDA -> ESP32 GPIO 21
-MPU6050 INT -> ESP32 GPIO 15
+MPU6050 INT -> ESP32 GPIO 13
 MPU6050 AD0 -> GND  (dia chi I2C = 0x68)
 MPU6050 XCL, XDA -> khong noi
 ```

@@ -1,206 +1,215 @@
-# 06 - Tiến độ và chi phí
+# 06 - Tiến độ, checklist và chi phí
 
 ## Mục lục
 
 - [1. Timeline tổng thể 6 tuần](#1-timeline-tổng-thể-6-tuần)
-- [2. Chi tiết công việc từng tuần](#2-chi-tiết-công-việc-từng-tuần)
+- [2. Checklist theo tuần](#2-checklist-theo-tuần)
 - [3. Biểu đồ Gantt](#3-biểu-đồ-gantt)
-- [4. Phân công nhóm](#4-phân-công-nhóm)
-- [5. Cột mốc (Milestones)](#5-cột-mốc-milestones)
-- [6. Bảng chi phí chi tiết](#6-bảng-chi-phí-chi-tiết)
-- [7. Ngân sách dự phòng](#7-ngân-sách-dự-phòng)
+- [4. Milestones](#4-milestones)
+- [5. Checklist còn lại trước khi chốt demo](#5-checklist-còn-lại-trước-khi-chốt-demo)
+- [6. Changelog phát sinh ngoài checklist](#6-changelog-phát-sinh-ngoài-checklist)
+- [7. Chi phí](#7-chi-phí)
 - [8. Deliverables cuối kỳ](#8-deliverables-cuối-kỳ)
 
 ---
 
 ## 1. Timeline tổng thể 6 tuần
 
-Dự án được chia thành **6 tuần**, phù hợp với 1 học kỳ ngắn hoặc nửa học kỳ dài (ngoài thời
-gian học lý thuyết). Mỗi tuần có mục tiêu cụ thể và deliverable rõ ràng.
+Timeline hiện tại đã được cập nhật theo kiến trúc mới: **ESP32 + Firebase Realtime Database + React Web App/PWA**. Các mục Telegram cũ không còn là hướng triển khai chính.
 
-| Tuần | Chủ đề | Deliverable chính |
-|------|--------|-------------------|
-| 1 | Khởi động & mua linh kiện | Repo git, tài liệu planning, đơn linh kiện |
-| 2 | Prototype phần cứng | Mạch breadboard đọc được cảm biến + blink LED |
-| 3 | Tích hợp mạng | Gửi được tin nhắn Telegram test từ ESP32 |
-| 4 | Hoàn thiện logic | FSM + PIN + tất cả lệnh hoạt động |
-| 5 | Tinh chỉnh & đóng gói | Vỏ hộp + tuning threshold + pin |
-| 6 | Kiểm thử & trình bày | Video demo + báo cáo + slide + thuyết trình thử |
+| Tuần | Chủ đề | Deliverable chính | Trạng thái |
+|------|--------|-------------------|------------|
+| 1 | Khởi động & planning | Repo, docs nền, BOM, kiến trúc Firebase | ✅ Xong |
+| 2 | Prototype phần cứng | ESP32 đọc được MPU6050/MPU6500, LED/còi hoạt động | ✅ Xong |
+| 3 | Cloud & Web App | Firebase project, Auth, Realtime Database, React Web App | ✅ Xong bản prototype |
+| 4 | Firmware core | FSM, motion filter, alarm, battery, Firebase command/status/log | ✅ Xong bản hiện tại |
+| 5 | Tối ưu phản hồi & phần cứng thật | Queue Firebase, offline alert queue, test vật lý, cập nhật sơ đồ nối dây | ✅ Xong bản hiện tại |
+| 6 | Kiểm thử & bàn giao | Build/test pass, docs khớp kiến trúc, chuẩn bị báo cáo/demo | ⬜ Đang hoàn thiện |
 
-## 2. Chi tiết công việc từng tuần
+## 2. Checklist theo tuần
 
-### Tuần 1 - Khởi động
+Quy ước:
 
-**Mục tiêu**: Hoàn thiện planning, setup repo, đặt hàng linh kiện.
+- ✅ Đã hoàn thành hoặc đã xác minh trong repo/thiết bị thật.
+- ⬜ Chưa làm hoặc chưa có bằng chứng xác minh đủ chắc.
+- 🟡 Đã có prototype nhưng còn cần siết lại trước demo cuối.
 
-| Task | Thời gian | Người phụ trách | Trạng thái |
-|------|-----------|-----------------|------------|
-| Lập tài liệu 7 file markdown ở `docs/` | 2-3 ngày | Cả nhóm | To do |
-| Tạo GitHub repo, thiết lập `.gitignore`, branch `main` | 0.5 ngày | Leader | To do |
-| Đặt mua linh kiện theo BOM | 0.5 ngày (shipping 3-5 ngày) | HW lead | To do |
-| Cài VSCode + PlatformIO trên máy từng thành viên | 1 ngày | Cả nhóm | To do |
-| Tạo Telegram bot với BotFather và lấy chat_id | 0.5 ngày | Dev | To do |
+### Tuần 1 - Planning & Repo
 
-**Cuối tuần 1**: có đủ tài liệu, repo đã setup, linh kiện đang trên đường về.
+- ✅ Tạo cấu trúc repo gồm `firmware/`, `web-app/`, `docs/`.
+- ✅ Viết bộ tài liệu nền trong `docs/`.
+- ✅ Tạo `.gitignore`, bỏ qua `secrets.h`, `.pio/`, build artifact.
+- ✅ Xác định kiến trúc mới: Firebase Realtime Database + React Web App/PWA.
+- ✅ Tạo `secrets.example.h` cho firmware.
+- ⬜ Chốt Firebase Rules production theo mô hình owner/pairing.
 
 ### Tuần 2 - Prototype phần cứng
 
-**Mục tiêu**: Lắp mạch xong trên breadboard, đọc được các cảm biến.
+- ✅ Nối ESP32 với MPU6050/MPU6500 qua I2C: SDA GPIO21, SCL GPIO22.
+- ✅ Xác định module cảm biến thực tế có thể là MPU6500 (`WHO_AM_I=0x70`).
+- ✅ Firmware hỗ trợ cả MPU6050 (`0x68`) và MPU6500 (`0x70`).
+- ✅ Test sensor diagnostic, in `ax/ay/az`, `delta`, `average`, gyro và lỗi đọc.
+- ✅ Nối LED xanh GPIO26, LED đỏ GPIO27, còi GPIO25.
+- ✅ Thiết bị vật lý đã test và hoạt động ổn ở mức prototype.
+- ✅ Đồng bộ sơ đồ nối dây MPU INT về GPIO13 trong docs.
 
-| Task | Thời gian | Người phụ trách |
-|------|-----------|-----------------|
-| Nhận linh kiện, kiểm tra đủ và hoạt động | 0.5 ngày | HW lead |
-| Lắp khối nguồn (TP4056 + MT3608), chỉnh 5V | 0.5 ngày | HW lead |
-| Lắp ESP32 + test blink LED | 0.5 ngày | HW lead |
-| Viết sketch test I2C scanner, xác nhận MPU6050 | 0.5 ngày | Dev |
-| Viết sketch đọc gia tốc, in ra Serial | 1 ngày | Dev |
-| Viết sketch test MPU6050 motion logic | 0.5 ngày | Dev |
-| Viết sketch test buzzer + LED trạng thái | 0.5 ngày | Dev |
+### Tuần 3 - Firebase & Web App
 
-**Cuối tuần 2**: mọi cảm biến và output đã được test độc lập.
+- ✅ Tạo React Web App dùng Firebase Auth và Realtime Database.
+- ✅ Web App có đăng ký/đăng nhập email/password.
+- ✅ Web App có quản lý thiết bị theo MAC address.
+- ✅ Web App gửi lệnh `ARM`, `DISARM`, `SILENCE` qua `/devices/<MAC>/command`.
+- ✅ Web App đọc trạng thái, pin, RSSI, `last_seen` realtime.
+- ✅ Web App hiển thị log cảnh báo từ `/logs`.
+- ✅ Có notification local của browser khi Web App đang mở và thiết bị chuyển `TRIGGERED`.
+- 🟡 FCM Web Push thật khi app đóng chưa triển khai, đang để là hướng nâng cấp sau.
 
-### Tuần 3 - Tích hợp mạng
+### Tuần 4 - Firmware core
 
-**Mục tiêu**: ESP32 kết nối WiFi và Telegram thành công.
+- ✅ `motion` đọc MPU qua driver I2C nội bộ, lấy mẫu 50 Hz.
+- ✅ `MotionFilter` dùng buffer 10 mẫu, threshold `0.30 g`, persistence 3 mẫu.
+- ✅ `fsm` có các state: `Boot`, `Disarmed`, `Armed`, `Triggered`, `Offline`.
+- ✅ `alarm` điều khiển LED/còi theo state và timeout còi.
+- ✅ `battery` đọc ADC GPIO34 và tính phần trăm pin.
+- ✅ `wifi_mgr` dùng WiFiManager captive portal và reset WiFi bằng nút BOOT.
+- ✅ `firebase_mgr` lắng nghe command từ Firebase stream.
+- ✅ Firmware build pass với `esp32dev`.
+- ✅ Native unit test cho `MotionFilter` pass.
+- ⬜ Chưa tách thành FreeRTOS task riêng; hiện dùng Arduino `loop()` + queue nhẹ.
 
-| Task | Thời gian | Người phụ trách |
-|------|-----------|-----------------|
-| Implement `wifi_mgr` module + reconnect logic | 1 ngày | Dev |
-| Tích hợp `UniversalTelegramBot`, gửi tin nhắn hello world | 0.5 ngày | Dev |
-| Implement `tg_poll()` - nhận lệnh `/start`, `/ping` | 1 ngày | Dev |
-| Implement format tin nhắn alert có emoji và timestamp | 0.5 ngày | Dev |
-| Test mất WiFi và reconnect tự động | 0.5 ngày | Dev + Tester |
-| Viết file `secrets.example.h` + update `.gitignore` | 0.5 ngày | Dev |
+### Tuần 5 - Tối ưu phản hồi ESP32 -> Firebase
 
-**Cuối tuần 3**: gõ lệnh vào Telegram -> ESP32 nhận và phản hồi được.
+- ✅ Đưa `firebase_poll()` xuống sau motion polling để ưu tiên cảm biến/còi.
+- ✅ `firebase_update_status()` không ghi mạng trực tiếp từ FSM nữa, chỉ queue status.
+- ✅ `firebase_send_alert()` không ghi mạng trực tiếp trong nhánh motion nữa, chỉ queue alert.
+- ✅ Thêm hàng đợi RAM tối đa 8 motion alert để gửi lại khi Firebase sẵn sàng.
+- ✅ Ưu tiên đẩy `status=TRIGGERED` trước alert log để Web App nhận cảnh báo nhanh hơn.
+- ✅ Dọn cấu hình Telegram cũ khỏi `config.h`.
+- ✅ Web App `npm run lint` pass.
+- ✅ Web App `npm run build` pass.
+- ✅ Docs kiến trúc cập nhật lại theo Firebase, không còn mô tả Telegram là luồng chính.
 
-### Tuần 4 - Hoàn thiện logic
+### Tuần 6 - Kiểm thử & bàn giao
 
-**Mục tiêu**: Tất cả lệnh, FSM, PIN hoạt động đúng spec.
-
-| Task | Thời gian | Người phụ trách |
-|------|-----------|-----------------|
-| Implement module `fsm` đầy đủ với tất cả transitions | 1 ngày | Dev |
-| Implement module `motion` với buffer + persistence | 1 ngày | Dev |
-| Implement module `auth` với SHA256 + NVS | 1 ngày | Dev |
-| Tích hợp tất cả vào `main.cpp` với FreeRTOS task | 1 ngày | Dev |
-| Test end-to-end tất cả lệnh | 0.5 ngày | Tester |
-| Fix bug đợt 1 | 0.5 ngày | Dev |
-
-**Cuối tuần 4**: firmware v1.0 đạt tất cả FR "Must".
-
-### Tuần 5 - Tinh chỉnh & đóng gói
-
-**Mục tiêu**: Hoàn thiện tuning, vỏ hộp, và tính năng pin.
-
-| Task | Thời gian | Người phụ trách |
-|------|-----------|-----------------|
-| Tuning `MOTION_THRESHOLD` qua nhiều test case thực tế | 1 ngày | Tester + Dev |
-| Implement đo pin và cảnh báo pin yếu | 0.5 ngày | Dev |
-| Test thời lượng pin liên tục | 0.5 ngày (chạy nền) | Tester |
-| Chuyển từ breadboard sang perfboard có hàn | 1 ngày | HW lead |
-| Khoan lỗ, lắp vào vỏ hộp | 1 ngày | HW lead |
-| In nhãn dán tên nhóm / logo | 0.5 ngày | Docs |
-
-**Cuối tuần 5**: thiết bị hoàn thiện dạng sản phẩm, pin dùng được ít nhất 8h.
-
-### Tuần 6 - Kiểm thử & trình bày
-
-**Mục tiêu**: Sẵn sàng demo và bàn giao.
-
-| Task | Thời gian | Người phụ trách |
-|------|-----------|-----------------|
-| Chạy đầy đủ test suite (9 test case ở `07-testing-and-risks.md`) | 1 ngày | Tester |
-| Fix bug đợt 2 | 0.5 ngày | Dev |
-| Viết báo cáo Word / PDF (10-15 trang) | 1.5 ngày | Docs |
-| Làm slide PowerPoint (15-20 slide) | 0.5 ngày | Docs |
-| Quay video demo 60-120s (có lồng tiếng) | 1 ngày | Cả nhóm |
-| Tập thuyết trình 2-3 lần | 0.5 ngày | Cả nhóm |
-| Nộp bài + demo chính thức | 0.5 ngày | Cả nhóm |
-
-**Cuối tuần 6**: nộp bài hoàn chỉnh, demo thành công.
+- ✅ `platformio run -e esp32dev` pass.
+- ✅ `platformio test -e native` pass.
+- ✅ `npm run lint` pass.
+- ✅ `npm run build` pass.
+- 🟡 Bundle web-app đang lớn hơn 500 kB sau minify; chưa chặn demo nhưng nên tối ưu nếu còn thời gian.
+- ⬜ Chạy full manual test theo `docs/07-testing-and-risks.md` và ghi kết quả vào `docs/test-report.md`.
+- ⬜ Chụp ảnh/video demo cuối cùng theo kiến trúc Firebase.
+- ⬜ Chuẩn bị slide và báo cáo nộp cuối kỳ.
+- ⬜ Tạo tag release `v1.0` sau khi chốt test vật lý cuối.
 
 ## 3. Biểu đồ Gantt
 
 ```mermaid
 gantt
-    title LapGuard Timeline 6 tuan
+    title LapGuard Firebase Timeline 6 tuan
     dateFormat  YYYY-MM-DD
     axisFormat  W%V
 
     section Tuan 1
-    Planning + docs          :a1, 2026-05-04, 3d
-    Setup repo + Telegram    :a2, after a1, 2d
-    Mua linh kien            :a3, 2026-05-04, 5d
+    Planning + docs               :done, a1, 2026-05-04, 3d
+    Setup repo + PlatformIO       :done, a2, after a1, 2d
+    BOM + mua linh kien           :done, a3, 2026-05-04, 5d
 
     section Tuan 2
-    Lap nguon + ESP32        :b1, 2026-05-11, 2d
-    Test cam bien            :b2, after b1, 3d
-    Test output              :b3, after b1, 2d
+    Lap ESP32 + sensor            :done, b1, 2026-05-11, 2d
+    Chan doan MPU6050/6500        :done, b2, after b1, 2d
+    Test LED + buzzer             :done, b3, after b1, 2d
 
     section Tuan 3
-    WiFi + Telegram          :c1, 2026-05-18, 3d
-    Format alert + poll cmd  :c2, after c1, 2d
-    Test reconnect           :c3, after c2, 1d
+    Firebase project + Auth       :done, c1, 2026-05-18, 2d
+    React Web App dashboard       :done, c2, after c1, 3d
+    Command sync qua RTDB         :done, c3, after c2, 1d
 
     section Tuan 4
-    Module FSM + motion      :d1, 2026-05-25, 3d
-    Module auth              :d2, after d1, 1d
-    Integration              :d3, after d2, 2d
-    Fix bugs                 :d4, after d3, 1d
+    FSM + motion + alarm          :done, d1, 2026-05-25, 3d
+    Battery + WiFiManager         :done, d2, after d1, 1d
+    Firebase firmware integration :done, d3, after d2, 2d
 
     section Tuan 5
-    Tuning threshold         :e1, 2026-06-01, 2d
-    Pin + monitoring         :e2, after e1, 1d
-    Vo hop + han mach        :e3, 2026-06-01, 4d
+    Hardware physical test        :done, e1, 2026-06-01, 2d
+    Firebase queue optimization   :done, e2, after e1, 2d
+    Docs sync architecture        :done, e3, after e2, 1d
 
     section Tuan 6
-    Full test                :f1, 2026-06-08, 1d
-    Fix bugs + tai lieu      :f2, after f1, 2d
-    Video + slide            :f3, after f2, 2d
-    Demo + nop bai           :f4, after f3, 1d
+    Full verification             :active, f1, 2026-06-08, 2d
+    Report + slide + video        :f2, after f1, 3d
+    Release tag + final demo      :f3, after f2, 1d
 ```
 
-> Lưu ý: các ngày cụ thể là **placeholder**, cập nhật theo lịch thực tế của nhóm.
+> Ngày trong Gantt là mốc kế hoạch tương đối. Trạng thái thực tế được theo dõi bằng checklist ở trên.
 
-## 4. Phân công nhóm
+## 4. Milestones
 
-Giả định nhóm 4 người. Nếu nhóm ít/nhiều hơn, phân bổ lại công việc.
+| ID | Mốc | Tiêu chí đạt | Trạng thái |
+|----|-----|--------------|------------|
+| M0 | Planning xong | Repo + docs nền + BOM + hướng kiến trúc | ✅ |
+| M1 | Hardware prototype ok | ESP32 đọc cảm biến, LED/còi hoạt động | ✅ |
+| M2 | Firebase/Web App prototype | Login, add device, gửi command qua RTDB | ✅ |
+| M3 | Firmware v1 | FSM, motion, alarm, battery, WiFiManager, Firebase stream | ✅ |
+| M4 | Tối ưu độ trễ cloud | Motion không gọi Firebase trực tiếp, có queue alert/status | ✅ |
+| M5 | Verification | Firmware build/test pass, web build/lint pass | ✅ |
+| M6 | Bàn giao cuối | Full manual test, video, slide, report, tag `v1.0` | ⬜ |
 
-| Vai trò | Phụ trách chính | Thời gian ước tính |
-|---------|-----------------|---------------------|
-| **Leader** | Điều phối, quản lý tiến độ, họp weekly, tổng hợp tài liệu | ~20h |
-| **Firmware Dev** | Viết code ESP32, implement module, debug | ~40h |
-| **Hardware Lead** | Mua linh kiện, lắp mạch, hàn, làm vỏ | ~25h |
-| **Tester / Docs** | Test cases, video demo, báo cáo, slide | ~25h |
+## 5. Checklist còn lại trước khi chốt demo
 
-Mọi thành viên đều cần hiểu cơ bản hệ thống để trả lời câu hỏi của giảng viên.
+### Bắt buộc
 
-### Meeting schedule
+- ⬜ Chạy manual test end-to-end trên thiết bị thật:
+  - ARM từ Web App.
+  - Lắc/nhấc laptop để vào `TRIGGERED`.
+  - Còi/LED phản hồi ngay.
+  - Web App nhận status/log.
+  - DISARM/SILENCE từ Web App.
+- ⬜ Test mất WiFi khi đang armed:
+  - Thiết bị vào `OFFLINE`.
+  - Vẫn phát hiện motion local.
+  - Khi WiFi lại, alert trong RAM được đẩy lên Firebase.
+- ⬜ Ghi kết quả test vào `docs/test-report.md`.
+- ⬜ Chốt Firebase Rules đủ dùng cho demo, tối thiểu không để database public hoàn toàn nếu trình bày bảo mật.
+- ⬜ Tạo tag `v1.0` sau khi test cuối pass.
 
-- **Daily standup**: 15 phút mỗi ngày (tuỳ chọn, nhất là tuần 4-6).
-- **Weekly sync**: 1 giờ vào chủ nhật, review tuần cũ + plan tuần mới.
-- **Mid-term check**: cuối tuần 3, đảm bảo khớp milestone M2.
+### Nên làm nếu còn thời gian
 
-## 5. Cột mốc (Milestones)
+- ⬜ Tối ưu bundle web-app hoặc tách code-splitting để bỏ warning > 500 kB.
+- ⬜ Viết hướng dẫn deploy web-app lên Firebase Hosting/Vercel.
+- ⬜ Thêm ảnh/screenshot Web App vào báo cáo.
+- ⬜ Ghi rõ giới hạn: notification hiện hoạt động tốt khi Web App đang mở; FCM push khi app đóng là hướng nâng cấp sau.
 
-| ID | Mốc | Deadline | Tiêu chí đạt |
-|----|-----|----------|---------------|
-| M0 | Planning xong | Cuối tuần 1 | 7 file markdown trong `docs/` đã merge vào main |
-| M1 | HW Prototype ok | Cuối tuần 2 | Video ngắn cho thấy đọc được cảm biến + còi kêu |
-| M2 | Kết nối Telegram ok | Cuối tuần 3 | Gõ `/ping` -> bot trả về `pong` |
-| M3 | Firmware v1.0 | Cuối tuần 4 | Tất cả FR "Must" pass, demo được 3 kịch bản sử dụng |
-| M4 | Sản phẩm hoàn thiện | Cuối tuần 5 | Thiết bị đóng hộp, pin 8h+ |
-| M5 | Bàn giao | Cuối tuần 6 | Video + slide + báo cáo + demo trực tiếp |
+### Hướng nâng cấp sau demo
 
-## 6. Bảng chi phí chi tiết
+- ⬜ Pairing bằng mã claim thay vì chỉ nhập MAC address.
+- ⬜ Firebase Cloud Functions + FCM Web Push thật.
+- ⬜ FreeRTOS tasks riêng cho sensor/network/FSM nếu cần độ trễ ổn định hơn.
+- ⬜ OTA firmware update.
 
-### 6.1 Linh kiện chính
+## 6. Changelog phát sinh ngoài checklist
+
+Các thay đổi này phát sinh trong quá trình debug/thử phần cứng, không có trong kế hoạch ban đầu:
+
+- ✅ Phát hiện module bán là MPU6050 nhưng thực tế có thể là MPU6500; firmware đã hỗ trợ cả hai.
+- ✅ Thêm `docs/problem.md` để ghi lại quá trình chẩn đoán lỗi cảm biến không nhận.
+- ✅ Thêm sensor diagnostics build (`esp32dev-sensor-test`) để đọc raw accel/gyro và kiểm tra độ nhạy.
+- ✅ Chuyển kiến trúc cloud từ Telegram Bot sang Firebase Realtime Database + React Web App.
+- ✅ Thêm WiFiManager captive portal để cấu hình WiFi không cần hardcode SSID/password.
+- ✅ Thêm reset WiFi bằng nút BOOT trong cửa sổ 3 giây sau khởi động.
+- ✅ Thêm NTP sync sau khi WiFi kết nối.
+- ✅ Dọn web-app để `npm run lint` pass.
+- ✅ Cập nhật docs để không mô tả sai rằng FCM/Web Push thật đã hoàn thành.
+- ✅ Cập nhật sơ đồ nối dây LED/còi và thống nhất MPU INT là GPIO13.
+- ✅ Tách Firebase write khỏi FSM/motion bằng hàng đợi status/alert trong firmware.
+
+## 7. Chi phí
+
+### 7.1 Linh kiện chính
 
 | # | Linh kiện | SL | Đơn giá (VND) | Thành tiền |
 |---|-----------|----|---------------|------------|
 | 1 | ESP32 DevKit V1 | 1 | 120.000 | 120.000 |
-| 2 | MPU6050 module | 1 | 25.000 | 25.000 |
+| 2 | MPU6050/GY-521 module | 1 | 25.000 | 25.000 |
 | 3 | Active buzzer module | 1 | 10.000 | 10.000 |
 | 4 | LED 5mm xanh + đỏ | 2 | 2.500 | 5.000 |
 | 5 | Pin 18650 2500mAh | 1 | 45.000 | 45.000 |
@@ -214,18 +223,18 @@ Mọi thành viên đều cần hiểu cơ bản hệ thống để trả lời 
 | 13 | Velcro + băng keo | 1 | 10.000 | 10.000 |
 | | **Tổng linh kiện** | | | **334.000** |
 
-### 6.2 Chi phí phụ trợ
+### 7.2 Chi phí phụ trợ
 
 | Hạng mục | Thành tiền |
 |----------|------------|
 | Phí ship linh kiện | 25.000 |
-| Pin dự phòng (nếu cháy) | 45.000 |
-| Dây cáp USB (nếu thiếu) | 20.000 |
+| Pin dự phòng nếu hỏng | 45.000 |
+| Dây cáp USB nếu thiếu | 20.000 |
 | In báo cáo màu | 30.000 |
 | In / ép plastic slide thuyết trình | 20.000 |
 | **Tổng phụ trợ** | **140.000** |
 
-### 6.3 Tổng ngân sách
+### 7.3 Tổng ngân sách
 
 ```text
 Linh kien chinh:     334.000 VND
@@ -237,109 +246,30 @@ Du phong 10%:         47.000 VND
 Ngan sach de xuat:   521.000 VND
 ```
 
-Chia cho nhóm 4 người: **~130.000 VND / người**.
-
-## 7. Ngân sách dự phòng
-
-Các rủi ro tài chính có thể xảy ra:
-
-| Rủi ro | Chi phí phát sinh | Biện pháp |
-|--------|-------------------|-----------|
-| Cháy ESP32 do đấu nhầm cực | +120.000 VND | Test kỹ nguồn trước khi cắm, luôn có 1 board dự phòng |
-| Hỏng pin 18650 | +45.000 VND | Không sạc quá mức, tắt công tắc khi không dùng |
-| Hỏng MPU6050 do tĩnh điện | +25.000 VND | Nối đất khi thao tác |
-| Hỏng breadboard | +25.000 VND | Dự phòng sẵn 1 bộ |
-
-Tổng dự phòng linh kiện: **~215.000 VND**. Nằm trong ngân sách 10% dự phòng ở trên.
-
 ## 8. Deliverables cuối kỳ
 
-Danh sách sản phẩm bàn giao khi kết thúc dự án:
+### 8.1 Mã nguồn
 
-### 8.1 Tài liệu
+- ✅ Firmware PlatformIO build được cho `esp32dev`.
+- ✅ Web App React build được bằng Vite.
+- ✅ Native test cho core motion filter pass.
+- ✅ `secrets.example.h` có trong repo, `secrets.h` không commit.
+- ⬜ Tag release `v1.0`.
 
-- [x] `README.md` + 7 file trong `docs/` (đã có ở dự án này).
-- [x] Báo cáo chính thức `.pdf` 10-15 trang (tổng hợp từ markdown).
-- [x] Slide PowerPoint `.pptx` 15-20 slide.
+### 8.2 Tài liệu
 
-### 8.2 Mã nguồn
+- ✅ `README.md` và docs nền.
+- ✅ Sơ đồ nối dây phần cứng.
+- ✅ Report chẩn đoán cảm biến trong `docs/problem.md`.
+- ✅ Timeline/checklist cập nhật theo Firebase.
+- ⬜ `docs/test-report.md` sau full manual test.
+- ⬜ Báo cáo PDF cuối kỳ.
+- ⬜ Slide thuyết trình.
 
-- [x] Repo GitHub public (hoặc private share với giảng viên).
-- [ ] Nhánh ổn định, có tag `v1.0` (hiện dùng `master`, chưa tạo tag).
-- [x] `secrets.example.h` có trong repo, `secrets.h` ignore.
-- [ ] `README` trong `firmware/` hướng dẫn build (chưa có file).
+### 8.3 Demo
 
-### 8.3 Phần cứng
-
-- [x] 1 thiết bị LapGuard hoàn chỉnh, đóng hộp, dán nhãn.
-- [x] Bộ pin 18650 đã sạc đầy.
-- [x] Cáp USB-C để sạc.
-
-### 8.4 Media
-
-- [x] Video demo YouTube hoặc Drive (60-120s).
-- [x] Ảnh sản phẩm high-res (ít nhất 5 góc).
-- [x] Screenshot Telegram khi có alert.
-
-### 8.5 Trình bày
-
-- [x] Thuyết trình 8-10 phút trước lớp + giảng viên.
-- [x] Demo trực tiếp (đã test trước).
-- [x] Sẵn sàng trả lời Q&A về kiến trúc, code, phần cứng.
-
-## 9. Log tiến độ thực tế
-
-> Cập nhật nhanh theo trạng thái hiện tại của repo để dễ theo dõi khi làm việc nhóm không ngồi chung.
-
-- **2026-05-31**: Đã khởi tạo `firmware/` bằng PlatformIO cho board `esp32dev` với framework Arduino.
-- **2026-05-31**: Đã dựng firmware scaffold gồm `config`, `alarm`, `auth`, `fsm`, `motion`, `net`, `power` và build PASS trên Windows.
-- **2026-05-31**: Telegram bot đã có các lệnh nền tảng `/arm`, `/disarm`, `/silence`, `/setpin`, `/reboot`, `/status`.
-- **2026-05-31**: MPU6050 đã được nối vào vòng đọc mẫu và FSM/alarm đã có phản hồi LED/buzzer ở mức prototype.
-- **2026-05-31**: `auth` đã nâng lên SHA-256 + salt, lưu trong `Preferences`, và build vẫn PASS.
-- **2026-05-31**: Native test suite trên host cho `pin_policy` và `motion_filter` đã PASS bằng `pio.exe test -e native`.
-- **2026-05-31**: Bước tiếp theo là nạp thử lên board thật, kiểm tra Serial Monitor, cảm biến và luồng Telegram end-to-end.
-
-## 10. Checkpoint tiến độ theo tuần
-
-> Quy ước: ✅ = đã xong trên repo hiện tại, ⬜ = chưa làm xong hoặc chưa kiểm tra được khi chưa có board.
-
-### Tuần 1
-
-- ✅ Hoàn thành bộ tài liệu 7 file markdown trong `docs/`
-- ⬜ Tạo GitHub repo public / thống nhất nhánh `main`
-- ⬜ Tạo Telegram bot thật bằng BotFather và lấy `chat_id` chính thức
-- ⬜ Cài VSCode + PlatformIO trên toàn bộ máy thành viên
-
-### Tuần 2
-
-- ⬜ Lắp khối nguồn TP4056 + MT3608 trên board thật
-- ⬜ Test ESP32 + blink LED trên mạch thật
-- ⬜ Test MPU6050 / buzzer / LED bằng phần cứng
-
-### Tuần 3
-
-- ✅ Dựng `wifi_mgr` với reconnect logic
-- ✅ Tích hợp `UniversalTelegramBot` và command scaffold
-- ✅ Viết `secrets.example.h` và ignore `secrets.h`
-- ⬜ Test reconnect WiFi và nhận lệnh Telegram trên board thật
-
-### Tuần 4
-
-- ✅ Dựng `fsm` transitions cơ bản
-- ✅ Dựng `motion` buffer + persistence
-- ✅ Dựng `auth` SHA-256 + salt + `Preferences`
-- ✅ Chạy native test suite trên host cho `pin_policy` và `motion_filter`
-- ⬜ Tích hợp FreeRTOS tasks / chạy end-to-end trên board thật
-- ⬜ Test toàn bộ lệnh `/arm`, `/disarm`, `/silence`, `/setpin`, `/reboot`, `/status` bằng hardware
-
-### Tuần 5
-
-- ✅ Dựng module battery và cảnh báo pin yếu
-- ⬜ Tuning threshold bằng dữ liệu thực tế
-- ⬜ Chuyển sang perfboard / đóng hộp
-
-### Tuần 6
-
-- ⬜ Chạy full test suite trên thiết bị thật
-- ⬜ Viết báo cáo / slide / video demo
-- ⬜ Demo trực tiếp và chốt bàn giao
+- ✅ Thiết bị vật lý prototype đã test ổn.
+- ✅ Web App nhận/trả lệnh với Firebase ở mức prototype.
+- ⬜ Video demo cuối cùng.
+- ⬜ Ảnh sản phẩm và screenshot Web App.
+- ⬜ Demo trực tiếp trước giảng viên.
