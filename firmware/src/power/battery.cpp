@@ -5,6 +5,8 @@
 namespace lapguard {
 namespace {
 constexpr uint32_t kPollIntervalMs = 60000UL;
+constexpr uint16_t kBatteryValidMinMv = 2500;
+constexpr uint16_t kBatteryValidMaxMv = 5000;
 
 uint16_t current_mv = 0;
 unsigned long last_poll_ms = 0;
@@ -29,7 +31,16 @@ uint8_t mv_to_percent(uint16_t mv) {
   return static_cast<uint8_t>((clamped_mv * 100L) / span);
 }
 
+bool reading_is_valid(uint16_t mv) {
+  return mv >= kBatteryValidMinMv && mv <= kBatteryValidMaxMv;
+}
+
 void log_status() {
+  if (!reading_is_valid(current_mv)) {
+    Serial.printf("[PWR] Battery sense invalid: %u mV (check GPIO34 divider)\n", current_mv);
+    return;
+  }
+
   Serial.printf("[PWR] Battery: %u mV (%u%%)\n", current_mv, battery_percent());
 }
 }  // namespace
@@ -66,14 +77,18 @@ uint16_t battery_mv() {
 }
 
 uint8_t battery_percent() {
+  if (!reading_is_valid(current_mv)) {
+    return 0;
+  }
+
   return mv_to_percent(current_mv);
 }
 
 bool battery_is_low() {
-  return current_mv <= BAT_LOW_MV;
+  return reading_is_valid(current_mv) && current_mv <= BAT_LOW_MV;
 }
 
 bool battery_is_critical() {
-  return current_mv <= BAT_CRITICAL_MV;
+  return reading_is_valid(current_mv) && current_mv <= BAT_CRITICAL_MV;
 }
 }  // namespace lapguard

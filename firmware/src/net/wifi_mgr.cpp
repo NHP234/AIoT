@@ -8,6 +8,52 @@ namespace lapguard {
 namespace {
 WiFiManager wm;
 bool was_connected = false;
+bool time_sync_requested = false;
+bool time_sync_logged = false;
+bool time_sync_warning_logged = false;
+unsigned long time_sync_request_ms = 0;
+unsigned long last_time_check_ms = 0;
+
+constexpr time_t kMinValidEpoch = 1546300800;  // 2019-01-01
+constexpr unsigned long kTimeCheckIntervalMs = 1000UL;
+constexpr unsigned long kTimeSyncWarningMs = 15000UL;
+
+void request_time_sync() {
+  configTime(7 * 3600, 0, "pool.ntp.org", "time.google.com");
+  time_sync_requested = true;
+  time_sync_logged = false;
+  time_sync_warning_logged = false;
+  time_sync_request_ms = millis();
+  last_time_check_ms = 0;
+  Serial.println("[TIME] NTP sync requested");
+}
+
+void poll_time_sync() {
+  if (!time_sync_requested || time_sync_logged) {
+    return;
+  }
+
+  const unsigned long now_ms = millis();
+  if (now_ms - last_time_check_ms < kTimeCheckIntervalMs) {
+    return;
+  }
+  last_time_check_ms = now_ms;
+
+  const time_t now = time(nullptr);
+  if (now >= kMinValidEpoch) {
+    struct tm timeinfo;
+    localtime_r(&now, &timeinfo);
+    Serial.printf("[TIME] Current time: %02d:%02d:%02d\n",
+                  timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+    time_sync_logged = true;
+    return;
+  }
+
+  if (!time_sync_warning_logged && now_ms - time_sync_request_ms >= kTimeSyncWarningMs) {
+    Serial.println("[TIME] NTP still pending; continuing without local clock");
+    time_sync_warning_logged = true;
+  }
+}
 }  // namespace
 
 void wifi_init() {
@@ -70,25 +116,7 @@ void wifi_init() {
   if (wm.autoConnect(ap_name.c_str())) {
     Serial.println("[WIFI] Connected successfully!");
     was_connected = true;
-    
-    // Sync NTP time (Vietnam GMT+7)
-    configTime(7 * 3600, 0, "pool.ntp.org", "time.google.com");
-    Serial.print("[TIME] Syncing NTP");
-    time_t now = time(nullptr);
-    int retry = 0;
-    while (now < 1546300800 && retry < 20) {
-      delay(500);
-      Serial.print(".");
-      now = time(nullptr);
-      retry++;
-    }
-    if (now >= 1546300800) {
-      struct tm timeinfo;
-      localtime_r(&now, &timeinfo);
-      Serial.printf("\n[TIME] Current time: %02d:%02d:%02d\n", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
-    } else {
-      Serial.println("\n[TIME] NTP Sync Timeout (Check Internet Connection!)");
-    }
+    request_time_sync();
   } else {
     Serial.println("[WIFI] Config portal timed out. Operating in OFFLINE mode.");
     was_connected = false;
@@ -103,11 +131,14 @@ void wifi_poll() {
     if (!was_connected) {
       Serial.printf("[WIFI] Connected, IP: %s, RSSI: %d dBm\n", WiFi.localIP().toString().c_str(), WiFi.RSSI());
       was_connected = true;
+      request_time_sync();
     }
+    poll_time_sync();
   } else {
     if (was_connected) {
       Serial.println(F("[WIFI] Disconnected"));
       was_connected = false;
+      time_sync_requested = false;
     }
   }
 }
