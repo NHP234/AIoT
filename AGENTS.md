@@ -1,0 +1,1 @@
+Đọc các file trong folder docs/ để hiểu về dự án
