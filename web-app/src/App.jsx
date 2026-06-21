@@ -14,6 +14,8 @@ import DeviceManager from "./components/DeviceManager";
 import AlarmLogs from "./components/AlarmLogs";
 import ThemeToggle from "./components/ThemeToggle";
 
+const URGENT_VIBRATION_PATTERN = [400, 120, 400, 120, 900];
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -63,6 +65,9 @@ export default function App() {
             icon: "/favicon.svg",
             tag: payload.data?.tag || "lapguard-alert",
             requireInteraction: true,
+            renotify: true,
+            silent: false,
+            vibrate: URGENT_VIBRATION_PATTERN,
           });
         }
       },
@@ -137,6 +142,9 @@ export default function App() {
                       icon: "/favicon.svg",
                       tag: `alarm-${mac}`,
                       requireInteraction: true,
+                      renotify: true,
+                      silent: false,
+                      vibrate: URGENT_VIBRATION_PATTERN,
                     });
                   }
                 }

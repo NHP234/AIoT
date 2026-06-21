@@ -1,4 +1,13 @@
 .vscode/
 .firebase/
+
+# Dependencies and build output
+node_modules/
+web-app/dist/
+firmware/.pio/
+
+# Local secrets
+.env
+.env.local
 push-server/.env
 push-server/service-account.json

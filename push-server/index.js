@@ -6,6 +6,7 @@ const admin = require("firebase-admin");
 const databaseUrl = process.env.FIREBASE_DATABASE_URL;
 const port = Number(process.env.PORT || 3001);
 const startedAtMs = Date.now();
+const urgentVibrationPattern = [400, 120, 400, 120, 900];
 
 function loadCredential() {
   if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
@@ -128,6 +129,9 @@ async function sendPushForLog(logId, log) {
       tag: `lapguard-${log.device_id}`,
       url: "/",
       requireInteraction: "true",
+      renotify: "true",
+      silent: "false",
+      vibrate: JSON.stringify(urgentVibrationPattern),
     },
     webpush: {
       notification: {
@@ -135,6 +139,9 @@ async function sendPushForLog(logId, log) {
         badge: "/favicon.svg",
         tag: `lapguard-${log.device_id}`,
         requireInteraction: true,
+        renotify: true,
+        silent: false,
+        vibrate: urgentVibrationPattern,
       },
     },
   });

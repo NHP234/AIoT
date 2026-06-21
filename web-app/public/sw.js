@@ -1,4 +1,5 @@
 const CACHE_NAME = "lapguard-cache-v1";
+const URGENT_VIBRATION_PATTERN = [400, 120, 400, 120, 900];
 const ASSETS = [
   "/",
   "/index.html",
@@ -79,6 +80,7 @@ self.addEventListener("push", (event) => {
 
   const notification = payload.notification || {};
   const data = payload.data || {};
+  const vibrate = data.vibrate ? JSON.parse(data.vibrate) : notification.vibrate;
   const title = notification.title || data.title || "LapGuard alert";
   const options = {
     body: notification.body || data.body || "Thiết bị LapGuard có cảnh báo mới.",
@@ -86,6 +88,9 @@ self.addEventListener("push", (event) => {
     badge: "/favicon.svg",
     tag: data.tag || notification.tag || "lapguard-alert",
     requireInteraction: data.requireInteraction !== "false",
+    renotify: data.renotify !== "false",
+    silent: data.silent === "true",
+    vibrate: vibrate || URGENT_VIBRATION_PATTERN,
     data: {
       url: data.url || "/",
       ...data,
