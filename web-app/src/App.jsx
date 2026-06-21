@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { ref, onValue, off } from "firebase/database";
 import { auth, db } from "./firebase";
+import { setupFcm, unregisterFcmToken } from "./fcm";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -35,11 +36,52 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Request Notification Permission
+  // Register FCM token for Web Push
   useEffect(() => {
-    if ("Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission();
+    if (!user) {
+      return undefined;
     }
+
+    let cleanup = () => {};
+    let disposed = false;
+
+    setupFcm(user, {
+      onForegroundMessage: (payload) => {
+        const title = payload.notification?.title || payload.data?.title || "LapGuard alert";
+        const body =
+          payload.notification?.body ||
+          payload.data?.body ||
+          "Thiết bị LapGuard có cảnh báo mới.";
+
+        toast.error(`${title}: ${body}`, {
+          duration: 10000,
+        });
+
+        if ("Notification" in window && Notification.permission === "granted") {
+          new Notification(title, {
+            body,
+            icon: "/favicon.svg",
+            tag: payload.data?.tag || "lapguard-alert",
+            requireInteraction: true,
+          });
+        }
+      },
+    })
+      .then((unsubscribe) => {
+        if (disposed) {
+          unsubscribe();
+        } else {
+          cleanup = unsubscribe;
+        }
+      })
+      .catch((err) => {
+        console.error("[FCM] Setup failed:", err);
+      });
+
+    return () => {
+      disposed = true;
+      cleanup();
+    };
   }, [user]);
 
   // Synchronize Devices and Logs for Authenticated User
@@ -139,6 +181,9 @@ export default function App() {
 
   const handleLogout = async () => {
     try {
+      if (user) {
+        await unregisterFcmToken(user);
+      }
       await signOut(auth);
       toast.success("Đã đăng xuất thành công.");
     } catch (err) {

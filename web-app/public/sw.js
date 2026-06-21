@@ -3,14 +3,7 @@ const ASSETS = [
   "/",
   "/index.html",
   "/favicon.svg",
-  "/src/main.jsx",
-  "/src/App.jsx",
-  "/src/index.css",
-  "/src/firebase.js",
-  "/src/components/Auth.jsx",
-  "/src/components/Dashboard.jsx",
-  "/src/components/DeviceManager.jsx",
-  "/src/components/AlarmLogs.jsx"
+  "/manifest.json"
 ];
 
 // Install Event
@@ -66,6 +59,60 @@ self.addEventListener("fetch", (e) => {
     }).catch(() => {
       // Fallback for offline API/HTML
       return caches.match("/");
+    })
+  );
+});
+
+self.addEventListener("push", (event) => {
+  let payload;
+
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch {
+    payload = {
+      notification: {
+        title: "LapGuard",
+        body: event.data ? event.data.text() : "New alert",
+      },
+    };
+  }
+
+  const notification = payload.notification || {};
+  const data = payload.data || {};
+  const title = notification.title || data.title || "LapGuard alert";
+  const options = {
+    body: notification.body || data.body || "Thiết bị LapGuard có cảnh báo mới.",
+    icon: notification.icon || "/favicon.svg",
+    badge: "/favicon.svg",
+    tag: data.tag || notification.tag || "lapguard-alert",
+    requireInteraction: data.requireInteraction !== "false",
+    data: {
+      url: data.url || "/",
+      ...data,
+    },
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const targetUrl = event.notification.data?.url || "/";
+
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if ("focus" in client) {
+          client.navigate(targetUrl);
+          return client.focus();
+        }
+      }
+
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(targetUrl);
+      }
+
+      return undefined;
     })
   );
 });
