@@ -14,8 +14,10 @@ Tài liệu này cung cấp sơ đồ nối dây chi tiết và nhanh chóng ph�
 | | SDA | **GPIO 21** | I2C SDA | 3.3V | Chân DATA của bus I2C |
 | | INT | **GPIO 13** | Input Interrupt | 3.3V | Báo ngắt khi có chuyển động |
 | | AD0 | **GND** | Địa chỉ I2C | 0V | Đặt địa chỉ I2C cố định là `0x68` |
-| **Còi báo (Buzzer)** | VCC | **VIN** (hoặc 5V) | Nguồn cấp | 5.0V | Nguồn lấy sau mạch tăng áp MT3608 |
-| *(Module 3 chân)* | GND | **GND** | Nguồn cấp | 0V | GND chung toàn mạch |
+| **Còi báo 2 chân** | (+) chân dài | **GPIO 25** | Digital Output | 3.3V | Còi active loại nhỏ, GPIO xuất HIGH thì kêu |
+| *(đang dùng)* | (-) chân ngắn | **GND** | Nguồn cấp | 0V | GND chung toàn mạch |
+| **Còi báo module 3 chân** | VCC | **VIN** (hoặc 5V) | Nguồn cấp | 5.0V | Chỉ dùng nếu là module còi 3 chân |
+| *(tùy chọn)* | GND | **GND** | Nguồn cấp | 0V | GND chung toàn mạch |
 | | IN (IO) | **GPIO 25** | Digital Output | 3.3V | Xuất tín hiệu kích kêu còi (Active High) |
 | **LED Xanh (OK)** | Anode (+) | **GPIO 26** | Digital Output | 3.3V | Nối qua **Điện trở 220 Ohm** |
 | | Cathode (-) | **GND** | Nguồn cấp | 0V | GND chung toàn mạch |
@@ -55,14 +57,19 @@ Tài liệu này cung cấp sơ đồ nối dây chi tiết và nhanh chóng ph�
 6. Nối chân **AD0** của MPU6050 vào **GND** (để khóa địa chỉ I2C ở `0x68`).
 
 ### Khối Báo động (Còi & LED)
-1. **Module Còi 3 chân**:
+1. **Còi 2 chân (đang dùng trong prototype hiện tại)**:
+   * Nối chân **(+) chân dài** của còi vào **GPIO 25** của ESP32.
+   * Nối chân **(-) chân ngắn** của còi vào **GND** của ESP32.
+   * Còi 2 chân có phân cực. Nếu cắm ngược cực, còi có thể không kêu dù firmware đã vào trạng thái `TRIGGERED`.
+   * Cách nối này phù hợp để test nhanh với còi active loại nhỏ, dòng thấp. Nếu còi kêu yếu hoặc còi yêu cầu dòng lớn, nên dùng transistor/MOSFET kéo tải thay vì cấp trực tiếp từ GPIO.
+2. **Module Còi 3 chân (nếu thay sang module 3 chân sau này)**:
    * Nối chân **VCC** còi vào chân **VIN** của ESP32 (để lấy nguồn 5V mạnh cho còi hú to).
    * Nối chân **GND** còi vào chân **GND** của ESP32.
    * Nối chân **I/O** (hoặc **IN**) còi vào chân **GPIO 25** của ESP32.
-2. **LED Xanh (Trạng thái AN TOÀN / BẢO VỆ)**:
+3. **LED Xanh (Trạng thái AN TOÀN / BẢO VỆ)**:
    * Chân dài (Anode +) -> nối vào một đầu **Điện trở 220 Ohm** -> đầu còn lại điện trở nối vào **GPIO 26** của ESP32.
    * Chân ngắn (Cathode -) -> nối vào **GND** của ESP32.
-3. **LED Đỏ (Trạng thái CẢNH BÁO)**:
+4. **LED Đỏ (Trạng thái CẢNH BÁO)**:
    * Chân dài (Anode +) -> nối vào một đầu **Điện trở 220 Ohm** -> đầu còn lại điện trở nối vào **GPIO 27** của ESP32.
    * Chân ngắn (Cathode -) -> nối vào **GND** của ESP32.
 
