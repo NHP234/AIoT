@@ -62,7 +62,7 @@ Quy ước:
 - ✅ Web App đọc trạng thái, pin, RSSI, `last_seen` realtime.
 - ✅ Web App hiển thị log cảnh báo từ `/logs`.
 - ✅ Có notification local của browser khi Web App đang mở và thiết bị chuyển `TRIGGERED`.
-- 🟡 FCM Web Push thật khi app đóng chưa triển khai, đang để là hướng nâng cấp sau.
+- 🟡 FCM Web Push đã có scaffold client/service worker/push-server Node.js; cần chạy server và cấu hình VAPID để xác minh.
 
 ### Tuần 4 - Firmware core
 
@@ -175,14 +175,14 @@ gantt
 ### Nên làm nếu còn thời gian
 
 - ⬜ Tối ưu bundle web-app hoặc tách code-splitting để bỏ warning > 500 kB.
-- ⬜ Viết hướng dẫn deploy web-app lên Firebase Hosting/Vercel.
+- ⬜ Deploy web-app lên Firebase Hosting.
 - ⬜ Thêm ảnh/screenshot Web App vào báo cáo.
-- ⬜ Ghi rõ giới hạn: notification hiện hoạt động tốt khi Web App đang mở; FCM push khi app đóng là hướng nâng cấp sau.
+- ⬜ Chạy/deploy push-server Node.js và test FCM push khi Web App đóng.
 
 ### Hướng nâng cấp sau demo
 
 - ⬜ Pairing bằng mã claim thay vì chỉ nhập MAC address.
-- ⬜ Firebase Cloud Functions + FCM Web Push thật.
+- 🟡 Push-server Node.js + FCM Web Push scaffold đã có, chờ chạy/deploy và test thực tế.
 - ⬜ FreeRTOS tasks riêng cho sensor/network/FSM nếu cần độ trễ ổn định hơn.
 - ⬜ OTA firmware update.
 

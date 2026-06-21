@@ -1,1 +1,4 @@
 .vscode/
+.firebase/
+push-server/.env
+push-server/service-account.json

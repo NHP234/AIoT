@@ -53,7 +53,7 @@ flowchart LR
 
     subgraph Cloud[Firebase Cloud]
         FB[(Firebase Realtime Database)]
-        FCM[Firebase Cloud Messaging<br/>future push option]
+        FCM[Firebase Cloud Messaging]
     end
 
     subgraph User[Nguoi dung]
@@ -63,7 +63,8 @@ flowchart LR
     MCU <-->|WebSocket Realtime Sync| FB
     APP <-->|Realtime SDK| FB
     FB -->|Realtime event| APP
-    FCM -.->|Web Push future option| APP
+    FB -->|Push server watches logs| FCM
+    FCM -->|Web Push| APP
 ```
 
 Kiến trúc này sử dụng dịch vụ đám mây Firebase Realtime Database làm trung tâm điều phối trạng thái thời gian thực qua giao thức WebSockets. Người dùng và thiết bị ESP32 đồng bộ dữ liệu song hướng gần như tức thời.
@@ -95,7 +96,8 @@ Kiến trúc này sử dụng dịch vụ đám mây Firebase Realtime Database 
 3. ESP32 gọi `firebase_send_alert(delta_g)`.
 4. Cập nhật status thành `"TRIGGERED"` và ghi sự kiện vào danh sách `/logs` trên Firebase.
 5. React Web App đang mở nhận thay đổi realtime và hiển thị toast/native notification của trình duyệt.
-6. Nếu mất WiFi, thiết bị lưu tạm tối đa 8 cảnh báo motion vào RAM và đẩy lên Firebase khi có kết nối mạng trở lại. Web Push qua FCM là hướng nâng cấp sau.
+6. Push server Node.js lắng nghe `/logs/{logId}` và gửi Web Push qua FCM tới các token đã đăng ký của chủ thiết bị.
+7. Nếu mất WiFi, thiết bị lưu tạm tối đa 8 cảnh báo motion vào RAM và đẩy lên Firebase khi có kết nối mạng trở lại.
 
 ### Luồng 4: Đồng bộ trạng thái định kỳ
 

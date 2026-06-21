@@ -68,17 +68,57 @@ Chuẩn bị đầy đủ linh kiện theo [02-hardware.md](02-hardware.md#2-b�
    ```
 3. Mở file `.env` và điền đầy đủ các thông số cấu hình Firebase bác vừa lấy ở mục A.1:
    ```env
-   REACT_APP_FIREBASE_API_KEY="AIzaSy..."
-   REACT_APP_FIREBASE_AUTH_DOMAIN="lapguard-smart-alarm.firebaseapp.com"
-   REACT_APP_FIREBASE_DATABASE_URL="https://lapguard-default-rtdb.firebaseio.com"
-   REACT_APP_FIREBASE_PROJECT_ID="lapguard-smart-alarm"
-   REACT_APP_FIREBASE_APP_ID="1:1234..."
+   VITE_FIREBASE_API_KEY="AIzaSy..."
+   VITE_FIREBASE_AUTH_DOMAIN="lapguard-smart-alarm.firebaseapp.com"
+   VITE_FIREBASE_DATABASE_URL="https://lapguard-default-rtdb.firebaseio.com"
+   VITE_FIREBASE_PROJECT_ID="lapguard-smart-alarm"
+   VITE_FIREBASE_STORAGE_BUCKET="lapguard-smart-alarm.appspot.com"
+   VITE_FIREBASE_MESSAGING_SENDER_ID="123456789"
+   VITE_FIREBASE_APP_ID="1:1234..."
+   VITE_FIREBASE_VAPID_KEY="..."
    ```
-4. Chạy cài đặt và khởi động React Web App ở chế độ chạy thử:
+4. Tạo Web Push key cho FCM:
+   - Firebase Console -> Project settings -> Cloud Messaging.
+   - Ở mục **Web Push certificates**, bấm **Generate key pair**.
+   - Copy public key vào `VITE_FIREBASE_VAPID_KEY`.
+5. Chạy cài đặt và khởi động React Web App ở chế độ chạy thử:
    ```bash
    npm install
-   npm run start
+   npm run dev
    ```
+6. Deploy Firebase Hosting sau khi build/test pass (không cần Blaze plan):
+   ```bash
+   npm run build
+   cd ..
+   npx firebase-tools deploy --only hosting --project aiot-929e6
+   ```
+
+### A.3 Chạy Push Server để gửi FCM Web Push
+
+Firebase Cloud Functions yêu cầu Blaze plan. Để tránh cần nâng cấp plan, dự án dùng một server Node.js riêng trong thư mục `push-server/`.
+
+1. Tạo service account key trong Firebase Console:
+   - Project settings -> Service accounts.
+   - Bấm **Generate new private key**.
+   - Lưu file JSON thành `push-server/service-account.json`.
+2. Tạo file `.env`:
+   ```bash
+   cd push-server
+   cp .env.example .env
+   ```
+3. Điền:
+   ```env
+   FIREBASE_DATABASE_URL="https://aiot-929e6-default-rtdb.asia-southeast1.firebasedatabase.app"
+   GOOGLE_APPLICATION_CREDENTIALS="./service-account.json"
+   PORT=3001
+   ```
+4. Chạy server:
+   ```bash
+   npm install
+   npm start
+   ```
+
+Server này lắng nghe `/logs` và gửi FCM push tới token của chủ thiết bị. Nếu server không chạy, Web App vẫn có cảnh báo realtime khi tab đang mở, nhưng sẽ không có push khi app đã đóng.
 
 ## 3. Phần B - Cài môi trường phát triển
 
