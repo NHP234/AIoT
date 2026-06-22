@@ -114,6 +114,13 @@ Kiến trúc này sử dụng dịch vụ đám mây Firebase Realtime Database 
       "created_at": 1780722427,
       "devices": {
         "$device_mac": true
+      },
+      "fcm_tokens": {
+        "$token_key": {
+          "token": "FCM_WEB_PUSH_TOKEN",
+          "user_agent": "Mozilla/5.0 ...",
+          "updated_at": 1780725200
+        }
       }
     }
   },
@@ -134,11 +141,26 @@ Kiến trúc này sử dụng dịch vụ đám mây Firebase Realtime Database 
       "timestamp": 1780725100,
       "event_type": "MOTION_ALERT",
       "detail": "Phát hiện rung lắc mạnh (delta = 2.5g)",
-      "resolved": false
+      "resolved": false,
+      "push_sent_at": 1780725103,
+      "push_success_count": 2,
+      "push_failure_count": 0
     }
   }
 }
 ```
+
+Thiết bị hiện được quản lý theo mô hình **1 MAC = 1 owner chính** qua trường
+`/devices/<MAC>/owner_id`. Khi người dùng huỷ liên kết thiết bị trên Web App,
+ứng dụng xoá `/users/<uid>/devices/<MAC>` và đặt `owner_id = null`, cho phép tài
+khoản khác liên kết lại cùng MAC để test hoặc chuyển quyền sử dụng.
+
+Các token Web Push được lưu theo từng tài khoản trong
+`/users/<uid>/fcm_tokens`. Push server dùng `owner_id` để tìm đúng tài khoản chủ
+thiết bị, đọc danh sách token của tài khoản đó, rồi gửi FCM Web Push tới các
+trình duyệt/thiết bị đã đăng ký. Sau khi gửi thành công, push server ghi lại
+`push_sent_at`, `push_success_count`, `push_failure_count` vào log để tránh gửi
+lặp và hỗ trợ debug.
 
 ## 4. Máy trạng thái (Finite State Machine)
 
@@ -159,7 +181,8 @@ stateDiagram-v2
 
     TRIGGERED --> ARMED: "cmd_silence"
     TRIGGERED --> DISARMED: "cmd_disarm"
-    TRIGGERED --> TRIGGERED: "timeout 60s<br/>tu tat coi, van alert"
+    TRIGGERED --> ARMED: "timeout 60s<br/>wifi ok"
+    TRIGGERED --> OFFLINE: "timeout 60s<br/>wifi lost"
 
     OFFLINE --> DISARMED: "wifi ok &<br/>prev = DISARMED"
     OFFLINE --> ARMED: "wifi ok &<br/>prev = ARMED"
@@ -173,7 +196,7 @@ Các state và ý nghĩa:
 | DISARMED | Không giám sát, chờ lệnh | ON (liên tục) | OFF | OFF |
 | ARMED | Đang giám sát | Chớp chậm (1 Hz) | OFF | OFF |
 | TRIGGERED | Đã phát hiện trộm | OFF | ON (liên tục) | Hú 60s |
-| OFFLINE | Mất WiFi | Chớp cam phối 2 LED | Chớp cam phối 2 LED | Tuỳ state con |
+| OFFLINE | Mất WiFi | Chớp đồng thời | Chớp đồng thời | OFF |
 
 ## 5. Bảng chuyển trạng thái
 
@@ -186,15 +209,24 @@ Các state và ý nghĩa:
 | ARMED | `cmd_disarm` | DISARMED | Tắt còi (nếu có), cập nhật trạng thái "DISARMED" lên Firebase |
 | TRIGGERED | `cmd_silence` | ARMED | Tắt còi, LED đỏ nháy chậm, cập nhật trạng thái "ARMED" lên Firebase |
 | TRIGGERED | `cmd_disarm` | DISARMED | Tắt còi, LED xanh sáng liên tục, cập nhật trạng thái "DISARMED" |
-| TRIGGERED | `timer_60s` | TRIGGERED | Tắt còi tự động (chống tiếng ồn lâu), giữ nguyên trạng thái giám sát |
-| Bất kỳ | `wifi_lost` | OFFLINE | Nhớ `prev_state`, vẫn tiếp tục giám sát và báo động tại chỗ |
+| TRIGGERED | `timer_60s` | ARMED / OFFLINE | Tắt còi tự động sau 60 giây; nếu WiFi còn thì quay lại ARMED, nếu mất WiFi thì chuyển OFFLINE và nhớ `prev_state = ARMED` |
+| Bất kỳ | `wifi_lost` | OFFLINE | Nhớ `prev_state`; nếu trước đó là ARMED thì vẫn tiếp tục đọc cảm biến và có thể trigger local |
 | OFFLINE | `wifi_connected` | `prev_state` | Tự động thử đồng bộ các cảnh báo motion còn trong hàng đợi RAM lên Firebase |
 
 ## 6. Thuật toán phát hiện chuyển động
 
-### Cách tiếp cận kết hợp (sensor fusion đơn giản)
+### Cách tiếp cận hiện tại
 
-Dùng 2 cảm biến song song, OR lại để giảm false negative, kèm bộ lọc để giảm false positive:
+Phiên bản hiện tại dùng MPU6050/MPU6500 làm nguồn phát hiện chuyển động chính.
+Firmware đọc gia tốc theo chu kỳ 20 ms, tính delta so với trọng lực, rồi đưa
+qua bộ lọc trung bình/trì bền để giảm false positive.
+
+```
+motion_event = accel_alert AND persistence_passed
+```
+
+Cảm biến rung SW-420 được giữ như phương án mở rộng sau. Nếu bổ sung SW-420,
+logic dự kiến sẽ chuyển thành:
 
 ```
 motion_event = (accel_alert AND persistence_passed) OR vib_alert
@@ -233,7 +265,7 @@ Tham số mặc định:
 - ISR chỉ set cờ `vib_flag = true` (không làm gì nặng trong ISR).
 - Trong loop chính, nếu `vib_flag && state == ARMED` -> phát `motion_event` ngay.
 - SW-420 phản ứng < 1 ms, bắt được va chạm nhanh mà MPU6050 có thể miss.
-- *Lưu ý: Tính năng này đã được trì hoãn để triển khai ở các phiên bản sau nhằm tối ưu hóa chi phí và đơn giản hóa phần cứng prototype.*
+- *Lưu ý: Tính năng này chưa có trong firmware hiện tại; đây là option cho phiên bản sau.*
 
 ### Debounce báo động
 
@@ -253,20 +285,34 @@ Tham số mặc định:
   ```json
   {
     "rules": {
+      "users": {
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          ".write": "auth != null && auth.uid === $uid"
+        }
+      },
       "devices": {
         "$device_id": {
           ".read": "auth != null && data.child('owner_id').val() === auth.uid",
-          ".write": "auth != null && data.child('owner_id').val() === auth.uid"
+          ".write": "auth != null && (data.child('owner_id').val() === auth.uid || !data.child('owner_id').exists())"
+        }
+      },
+      "logs": {
+        ".indexOn": ["timestamp"],
+        "$log_id": {
+          ".read": "auth != null",
+          ".write": "auth != null"
         }
       }
     }
   }
   ```
-- Quy tắc này đảm bảo: Chỉ có người dùng là chủ sở hữu thiết bị (`owner_id` khớp với Firebase `auth.uid`) mới có quyền xem trạng thái và ghi lệnh (`command`) điều khiển thiết bị đó.
+- Quy tắc này đảm bảo: người dùng chỉ đọc/ghi dữ liệu tài khoản của chính mình; thiết bị đã có `owner_id` chỉ cho chủ sở hữu thao tác; thiết bị chưa có `owner_id` có thể được liên kết lần đầu hoặc liên kết lại sau khi huỷ liên kết.
+- Index `.indexOn: ["timestamp"]` ở `/logs` cần thiết vì push server query log mới theo `timestamp`; nếu thiếu, Firebase vẫn chạy nhưng sẽ cảnh báo và lọc dữ liệu ở client.
 
-### 7.3 Bảo mật API Keys và cấu hình dịch vụ
+### 7.3 Bảo mật secrets và cấu hình dịch vụ
 
-- Các khóa API của Firebase (API Key, Database URL, Storage Bucket) được lưu trữ trong file cấu hình [secrets.h](file:///C:/Users/cuphu/OneDrive/M%C3%A1y%20t%C3%ADnh/AIoT/firmware/src/secrets.h) và được bỏ qua không commit lên GitHub qua `.gitignore`.
+- Cấu hình Firebase cho firmware (`FIREBASE_HOST`, `FIREBASE_AUTH`) và tên thiết bị được lưu trong file [secrets.h](file:///C:/Users/cuphu/OneDrive/M%C3%A1y%20t%C3%ADnh/AIoT/firmware/src/secrets.h). File này được bỏ qua trong `.gitignore` để tránh commit thông tin nhạy cảm lên GitHub.
 
 ### 7.4 Bảo mật vận chuyển (HTTPS & WebSockets Secure)
 
@@ -276,13 +322,13 @@ Tham số mặc định:
 
 | Tình huống | Giải pháp |
 |------------|-----------|
-| MPU6050/MPU6500 không phản hồi I2C khi boot | Báo lỗi qua Serial + LED đỏ nhấp nháy SOS, dừng setup, không enter loop |
-| WiFi ngắt giữa chừng | Chuyển vào state OFFLINE, lưu tối đa 8 cảnh báo motion trong RAM và đẩy lại khi Firebase stream kết nối lại |
+| MPU6050/MPU6500 không phản hồi I2C khi boot | Báo lỗi qua Serial; firmware vẫn chạy các module còn lại nhưng motion detector không trigger |
+| WiFi ngắt giữa chừng | Chuyển vào state OFFLINE, nhớ state trước đó; nếu trước đó là ARMED thì vẫn đọc cảm biến, trigger local và lưu tối đa 8 cảnh báo motion trong RAM để đẩy lại khi Firebase stream kết nối lại |
 | Firebase API timeout | Tự động thử lại và duy trì kết nối WebSocket chạy ngầm |
 | Pin yếu (< 3.4V) | Gửi thông báo đẩy "pin yếu" lên Web App 1 lần duy nhất |
-| Pin cực yếu (< 3.0V) | Lưu state hiện tại vào NVS, shutdown an toàn |
-| Heap thấp | Watchdog 30s sẽ reset ESP32 nếu loop không feed, NVS giữ được trạng thái kết nối cũ |
-| Quên thông tin WiFi cũ hoặc đổi WiFi mới | ESP32 phát WiFi `LapGuard_AP` và tự động mở Captive Portal cấu hình WiFi mới |
+| Pin cực yếu (< 3.0V) | Firmware tính pin về 0%; chưa triển khai shutdown/NVS state tự động |
+| Heap thấp | ESP32/Arduino core watchdog vẫn là lớp bảo vệ nền; firmware chưa có health monitor riêng cho heap |
+| Quên thông tin WiFi cũ hoặc đổi WiFi mới | Giữ nút BOOT (GPIO0) trong 3 giây sau boot để xoá WiFi đã lưu; ESP32 phát AP `LapGuard_<MAC>` và mở Captive Portal cấu hình WiFi mới |
 
 ## 9. Timing diagram (sequence)
 
@@ -307,6 +353,7 @@ sequenceDiagram
     B-->>T: HÚ HÚ HÚ (~85dB)
     L->>FB: Ghi nhận trạng thái TRIGGERED và ghi log
     FB-->>P: Realtime update, Web App hiển thị notification nếu đang mở
+    FB-->>P: Push server gửi FCM Web Push nếu app đã đăng ký token
     P->>FB: Nhấn nút DISARM trên App (Ghi lệnh DISARM)
     FB->>L: Đẩy dữ liệu lệnh qua WebSocket (ngay lập tức)
     L->>L: FSM: TRIGGERED -> DISARMED
@@ -328,9 +375,9 @@ sequenceDiagram
     Note over L: state = OFFLINE (prev=ARMED)
     T->>L: Nhấc laptop đi
     L->>L: Phát hiện chuyển động
-    Note over L: Vẫn chuyển TRIGGERED local, còi hú vang
-    Note over L: Lưu cảnh báo motion vào hàng đợi RAM
-    Note over L: Sau 2 phút, WiFi tự động kết nối lại
+    Note over L: Vẫn phát hiện motion local và chuyển TRIGGERED
+    Note over L: Còi/LED báo tại chỗ theo FSM hiện tại, alert được xếp hàng RAM
+    Note over L: Sau đó WiFi tự động kết nối lại
     L->>FB: Đẩy các alert còn trong hàng đợi RAM lên Database
-    FB-->>P: Cập nhật nhật ký sự kiện lịch sử trên Web App
+    FB-->>P: Cập nhật nhật ký sự kiện lịch sử trên Web App và gửi Web Push nếu có token
 ```
